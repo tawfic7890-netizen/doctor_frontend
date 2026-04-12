@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import DoctorCard from '@/components/DoctorCard';
 import DoctorModal from '@/components/DoctorModal';
 import { api } from '@/lib/api';
-import { Doctor, getAprilStatus } from '@/lib/utils';
+import { Doctor, getCurrentMonthStatus } from '@/lib/utils';
 
 type TabFilter = 'all' | 'once' | 'twice' | 'none';
 
@@ -19,8 +19,8 @@ export default function AprilPage() {
   });
 
   const filtered = doctors.filter((d) => {
-    if (d.class?.toLowerCase() === 'f' && !d.apr_visit1 && !d.apr_visit2) return false;
-    const aprStatus = getAprilStatus(d);
+    if (d.class?.toLowerCase() === 'f' && getCurrentMonthStatus(d) === 'none') return false;
+    const aprStatus = getCurrentMonthStatus(d);
     if (tab === 'once'  && aprStatus !== 'once')  return false;
     if (tab === 'twice' && aprStatus !== 'twice') return false;
     if (tab === 'none'  && aprStatus !== 'none')  return false;
@@ -36,10 +36,10 @@ export default function AprilPage() {
   });
 
   const counts = {
-    all:   doctors.filter((d) => !(d.class?.toLowerCase() === 'f' && !d.apr_visit1 && !d.apr_visit2)).length,
-    twice: doctors.filter((d) => getAprilStatus(d) === 'twice').length,
-    once:  doctors.filter((d) => getAprilStatus(d) === 'once').length,
-    none:  doctors.filter((d) => getAprilStatus(d) === 'none' && d.class?.toLowerCase() !== 'f').length,
+    all:   doctors.filter((d) => !(d.class?.toLowerCase() === 'f' && getCurrentMonthStatus(d) === 'none')).length,
+    twice: doctors.filter((d) => getCurrentMonthStatus(d) === 'twice').length,
+    once:  doctors.filter((d) => getCurrentMonthStatus(d) === 'once').length,
+    none:  doctors.filter((d) => getCurrentMonthStatus(d) === 'none' && d.class?.toLowerCase() !== 'f').length,
   };
 
   const tabs: { key: TabFilter; label: string; color: string }[] = [

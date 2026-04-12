@@ -1,5 +1,5 @@
 'use client';
-import { Doctor, getDoctorStatus, getLastVisit, getAprilStatus, STATUS_COLORS, formatDate, daysSince } from '@/lib/utils';
+import { Doctor, getDoctorStatus, getLastVisit, getCurrentMonthStatus, getCurrentMonthName, STATUS_COLORS, formatDate, daysSince } from '@/lib/utils';
 
 interface DoctorCardProps {
   doctor: Doctor;
@@ -10,7 +10,8 @@ export default function DoctorCard({ doctor, onClick }: DoctorCardProps) {
   const status = getDoctorStatus(doctor);
   const statusColor = STATUS_COLORS[status];
   const lastVisit = getLastVisit(doctor);
-  const aprStatus = getAprilStatus(doctor);
+  const aprStatus = getCurrentMonthStatus(doctor);
+  const monthName = getCurrentMonthName();
 
   const classLabel = () => {
     if (status === 'DEAL') return { label: '⭐ DEAL', bg: 'bg-amber-500/20 text-amber-500 border-amber-500/30' };
@@ -27,9 +28,9 @@ export default function DoctorCard({ doctor, onClick }: DoctorCardProps) {
   const cls = classLabel();
 
   const aprBadge = () => {
-    if (aprStatus === 'twice') return { label: '✓✓ Apr', color: '#00A550', bg: 'rgba(0,165,80,0.15)' };
-    if (aprStatus === 'once')  return { label: '✓ Apr',  color: '#FFD700', bg: 'rgba(255,215,0,0.12)' };
-    return { label: '— Apr', color: '#6b7280', bg: 'rgba(107,114,128,0.15)' };
+    if (aprStatus === 'twice') return { label: `✓✓ ${monthName}`, color: '#00A550', bg: 'rgba(0,165,80,0.15)' };
+    if (aprStatus === 'once')  return { label: `✓ ${monthName}`,  color: '#FFD700', bg: 'rgba(255,215,0,0.12)' };
+    return { label: `— ${monthName}`, color: '#6b7280', bg: 'rgba(107,114,128,0.15)' };
   };
 
   const apr = aprBadge();
@@ -90,6 +91,13 @@ export default function DoctorCard({ doctor, onClick }: DoctorCardProps) {
               </span>
             )}
           </div>
+
+          {/* Note */}
+          {doctor.note && (
+            <p className="text-[11px] text-amber-400/80 mt-2 leading-snug line-clamp-2">
+              📝 {doctor.note}
+            </p>
+          )}
         </div>
 
         {/* APR badge */}

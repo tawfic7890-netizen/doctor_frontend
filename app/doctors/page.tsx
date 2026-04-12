@@ -1,38 +1,63 @@
 'use client';
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import DoctorCard from '@/components/DoctorCard';
 import DoctorModal from '@/components/DoctorModal';
 import FilterBar, { Filters } from '@/components/FilterBar';
 import { api } from '@/lib/api';
-import { Doctor } from '@/lib/utils';
+import { Doctor, getDoctorStatus, getCurrentMonthStatus } from '@/lib/utils';
 
 export default function DoctorsPage() {
   const [selected, setSelected] = useState<Doctor | null>(null);
   const [filters, setFilters] = useState<Filters>({
     search: '',
-    status: '',
+    statuses: [],
     day: '',
     area: '',
     hideF: true,
   });
 
-  const { data: doctors = [], isLoading, error } = useQuery({
-    queryKey: ['doctors', filters],
+  // Always fetch ALL doctors (including F) — hideF + statuses filtered client-side
+  const { data: allDoctors = [], isLoading, error } = useQuery({
+    queryKey: ['doctors', {
+      search: filters.search,
+      day: filters.day,
+      area: filters.area,
+    }],
     queryFn: () =>
       api.doctors.list({
         search: filters.search || undefined,
-        status: filters.status || undefined,
         day: filters.day || undefined,
         area: filters.area || undefined,
-        hideF: filters.hideF,
+        hideF: false, // always get all, we filter F client-side
       }),
     staleTime: 15000,
   });
 
+  // Apply hideF + multi-status client-side
+  const doctors = useMemo(() => {
+    let result = allDoctors;
+
+    // Hide ALL F colleagues when hideF is on
+    if (filters.hideF) {
+      result = result.filter((d) => d.class?.toLowerCase() !== 'f');
+    }
+
+    // Multi-status filter (OR logic)
+    if (filters.statuses.length > 0) {
+      result = result.filter((d) =>
+        filters.statuses.some((s) => {
+          if (s === 'CURRENT_MONTH') return getCurrentMonthStatus(d) !== 'none';
+          return getDoctorStatus(d) === s;
+        })
+      );
+    }
+
+    return result;
+  }, [allDoctors, filters.hideF, filters.statuses]);
+
   return (
     <div className="min-h-screen bg-base">
-      {/* Header */}
       <div className="bg-surface border-b border-line px-4 py-3 pr-14">
         <h1 className="text-lg font-bold text-content">Doctors</h1>
         <p className="text-xs text-muted">{doctors.length} shown</p>

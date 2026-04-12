@@ -1,10 +1,10 @@
 'use client';
 import { useState } from 'react';
-import { AREAS, DAYS } from '@/lib/utils';
+import { AREAS, DAYS, getCurrentMonthName } from '@/lib/utils';
 
 export interface Filters {
   search: string;
-  status: string;
+  statuses: string[];   // multi-select: 'NEVER' | 'NEED_VISIT' | 'CURRENT_MONTH' | 'DEAL'
   day: string;
   area: string;
   hideF: boolean;
@@ -16,10 +16,10 @@ interface FilterBarProps {
 }
 
 const STATUS_TABS = [
-  { value: '', label: 'All' },
-  { value: 'RECENT', label: '🟢 Apr' },
-  { value: 'NEVER', label: '🔴 Never' },
-  { value: 'NEED_VISIT', label: '🟠 Need' },
+  { value: 'CURRENT_MONTH', label: `🟢 ${getCurrentMonthName()}` },
+  { value: 'NEVER',         label: '🔴 Never' },
+  { value: 'NEED_VISIT',    label: '🟠 Need' },
+  { value: 'DEAL',          label: '⭐ Deal' },
 ];
 
 const DAY_TABS = DAYS.map((d) => ({ value: d, label: d }));
@@ -28,6 +28,15 @@ export default function FilterBar({ filters, onChange }: FilterBarProps) {
   const [showDays, setShowDays] = useState(false);
 
   const set = (partial: Partial<Filters>) => onChange({ ...filters, ...partial });
+
+  function toggleStatus(value: string) {
+    const has = filters.statuses.includes(value);
+    set({ statuses: has ? filters.statuses.filter((s) => s !== value) : [...filters.statuses, value] });
+  }
+
+  function clearStatuses() {
+    set({ statuses: [] });
+  }
 
   return (
     <div className="bg-base sticky top-0 z-40 border-b border-line px-3 py-2 space-y-2">
@@ -51,21 +60,39 @@ export default function FilterBar({ filters, onChange }: FilterBarProps) {
         )}
       </div>
 
-      {/* Status tabs + area + hideF */}
+      {/* Status tabs (multi-select) + day + hideF + area */}
       <div className="flex items-center gap-2 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
-        {STATUS_TABS.map((tab) => (
-          <button
-            key={tab.value}
-            onClick={() => set({ status: tab.value, day: '' })}
-            className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors ${
-              filters.status === tab.value && !filters.day
-                ? 'bg-accent text-on-accent'
-                : 'bg-surface text-muted hover:text-content border border-line'
-            }`}
-          >
-            {tab.label}
-          </button>
-        ))}
+        {/* All = clear */}
+        <button
+          onClick={clearStatuses}
+          className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors border ${
+            filters.statuses.length === 0
+              ? 'bg-accent text-on-accent border-accent'
+              : 'bg-surface text-muted hover:text-content border-line'
+          }`}
+        >
+          All
+        </button>
+
+        {STATUS_TABS.map((tab) => {
+          const active = filters.statuses.includes(tab.value);
+          return (
+            <button
+              key={tab.value}
+              onClick={() => toggleStatus(tab.value)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors border ${
+                active
+                  ? 'bg-accent text-on-accent border-accent'
+                  : 'bg-surface text-muted hover:text-content border-line'
+              }`}
+            >
+              {tab.label}
+              {active && filters.statuses.length > 1 && (
+                <span className="ml-1 opacity-60">✓</span>
+              )}
+            </button>
+          );
+        })}
 
         <button
           onClick={() => setShowDays((v) => !v)}
@@ -89,7 +116,6 @@ export default function FilterBar({ filters, onChange }: FilterBarProps) {
           {filters.hideF ? '👁 Show F' : '🙈 Hide F'}
         </button>
 
-        {/* Area dropdown */}
         <select
           value={filters.area}
           onChange={(e) => set({ area: e.target.value })}
@@ -102,11 +128,30 @@ export default function FilterBar({ filters, onChange }: FilterBarProps) {
         </select>
       </div>
 
+      {/* Active filter summary */}
+      {filters.statuses.length > 1 && (
+        <div className="flex items-center gap-1.5">
+          <span className="text-[10px] text-muted">Showing:</span>
+          {filters.statuses.map((s) => {
+            const tab = STATUS_TABS.find((t) => t.value === s);
+            return (
+              <button
+                key={s}
+                onClick={() => toggleStatus(s)}
+                className="text-[10px] bg-accent/15 text-accent border border-accent/30 rounded-full px-2 py-0.5 flex items-center gap-1"
+              >
+                {tab?.label} <span className="opacity-60">✕</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
       {/* Day tabs */}
       {showDays && (
         <div className="flex gap-2 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
           <button
-            onClick={() => { set({ day: '', status: '' }); setShowDays(false); }}
+            onClick={() => { set({ day: '' }); setShowDays(false); }}
             className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap border ${
               !filters.day ? 'bg-accent text-on-accent border-accent' : 'bg-surface text-muted border-line'
             }`}
@@ -116,7 +161,7 @@ export default function FilterBar({ filters, onChange }: FilterBarProps) {
           {DAY_TABS.map((tab) => (
             <button
               key={tab.value}
-              onClick={() => { set({ day: tab.value, status: '' }); setShowDays(false); }}
+              onClick={() => { set({ day: tab.value }); setShowDays(false); }}
               className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap border ${
                 filters.day === tab.value
                   ? 'bg-accent text-on-accent border-accent'

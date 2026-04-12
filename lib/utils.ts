@@ -1,3 +1,10 @@
+export interface Visit {
+  id: number;
+  doctor_id: number;
+  visited_at: string; // 'YYYY-MM-DD'
+  created_at: string;
+}
+
 export interface Doctor {
   id: number;
   name: string;
@@ -10,13 +17,8 @@ export interface Doctor {
   class: string;
   request: string;
   note: string;
-  visit1: string;
-  visit2: string;
-  mar_visit1: string;
-  mar_visit2: string;
-  apr_visit1: string;
-  apr_visit2: string;
   schedules: any;
+  visits?: Visit[];
 }
 
 export type DoctorStatus = 'DEAL' | 'NEVER' | 'NEED_VISIT' | 'RECENT' | 'F';
@@ -29,17 +31,9 @@ export function isDeal(doctor: Doctor): boolean {
 }
 
 export function getLastVisit(doctor: Doctor): Date | null {
-  const dates = [
-    doctor.visit1,
-    doctor.visit2,
-    doctor.mar_visit1,
-    doctor.mar_visit2,
-    doctor.apr_visit1,
-    doctor.apr_visit2,
-  ]
-    .filter(Boolean)
-    .map((d) => new Date(d));
-  if (dates.length === 0) return null;
+  const visits = doctor.visits ?? [];
+  if (visits.length === 0) return null;
+  const dates = visits.map((v) => new Date(v.visited_at));
   return new Date(Math.max(...dates.map((d) => d.getTime())));
 }
 
@@ -49,7 +43,7 @@ export function getDoctorStatus(doctor: Doctor): DoctorStatus {
   const last = getLastVisit(doctor);
   if (!last) return 'NEVER';
   const diffDays = (Date.now() - last.getTime()) / (1000 * 60 * 60 * 24);
-  if (diffDays > 30) return 'NEED_VISIT';
+  if (diffDays > 12) return 'NEED_VISIT';
   return 'RECENT';
 }
 
@@ -96,7 +90,6 @@ export function getClassBadge(cls: string): { label: string; color: string } {
     case 'A': return { label: 'A', color: '#00d4ff' };
     case 'B': return { label: 'B', color: '#6366f1' };
     case 'F': return { label: 'F', color: '#555' };
-    case 'A_LOWER':
     default:
       if (cls?.toLowerCase() === 'a') return { label: 'A*', color: '#a78bfa' };
       return { label: cls || '?', color: '#6b7280' };
@@ -118,10 +111,35 @@ export function daysSince(dateStr: string | null | undefined): string {
   return `${diff}d ago`;
 }
 
-export function getAprilStatus(doctor: Doctor): 'none' | 'once' | 'twice' {
-  if (doctor.apr_visit1 && doctor.apr_visit2) return 'twice';
-  if (doctor.apr_visit1) return 'once';
+/** Short name for the current month, e.g. "Apr" */
+export function getCurrentMonthName(): string {
+  return new Date().toLocaleString('en', { month: 'short' });
+}
+
+/** Visit count for the current calendar month from the visits array. */
+export function getCurrentMonthStatus(doctor: Doctor): 'none' | 'once' | 'twice' {
+  const now = new Date();
+  const prefix = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  const count = (doctor.visits ?? []).filter((v) => v.visited_at.startsWith(prefix)).length;
+  if (count >= 2) return 'twice';
+  if (count === 1) return 'once';
   return 'none';
+}
+
+/** Returns visits for the current month, sorted newest first. */
+export function getCurrentMonthVisits(doctor: Doctor): Visit[] {
+  const now = new Date();
+  const prefix = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  return (doctor.visits ?? [])
+    .filter((v) => v.visited_at.startsWith(prefix))
+    .sort((a, b) => b.visited_at.localeCompare(a.visited_at));
+}
+
+/** Returns all visits sorted newest first. */
+export function getAllVisitsSorted(doctor: Doctor): Visit[] {
+  return [...(doctor.visits ?? [])].sort((a, b) =>
+    b.visited_at.localeCompare(a.visited_at)
+  );
 }
 
 export const AREAS = [

@@ -1,7 +1,11 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Doctor, AREAS, DAYS, formatDate, getDoctorStatus, STATUS_COLORS } from '@/lib/utils';
+import {
+  Doctor, Visit, AREAS, DAYS,
+  formatDate, getDoctorStatus, STATUS_COLORS,
+  getAllVisitsSorted,
+} from '@/lib/utils';
 import { api } from '@/lib/api';
 
 interface DoctorModalProps {
@@ -22,9 +26,10 @@ export default function DoctorModal({ doctor, onClose }: DoctorModalProps) {
     time: '',
     request: '',
     note: '',
-    apr_visit1: '',
-    apr_visit2: '',
   });
+
+  const [newVisitDate, setNewVisitDate] = useState(TODAY);
+  const [showDatePicker, setShowDatePicker] = useState(false);
 
   useEffect(() => {
     if (doctor) {
@@ -36,38 +41,42 @@ export default function DoctorModal({ doctor, onClose }: DoctorModalProps) {
         time: doctor.time || '',
         request: doctor.request || '',
         note: doctor.note || '',
-        apr_visit1: doctor.apr_visit1 || '',
-        apr_visit2: doctor.apr_visit2 || '',
       });
+      setNewVisitDate(TODAY);
+      setShowDatePicker(false);
     }
   }, [doctor]);
 
+  const invalidate = () => {
+    queryClient.invalidateQueries({ queryKey: ['doctors'] });
+    queryClient.invalidateQueries({ queryKey: ['stats'] });
+  };
+
   const updateMutation = useMutation({
     mutationFn: (data: Partial<Doctor>) => api.doctors.update(doctor!.id, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['doctors'] });
-      queryClient.invalidateQueries({ queryKey: ['stats'] });
-      onClose();
-    },
+    onSuccess: () => { invalidate(); onClose(); },
   });
 
   const visitTodayMutation = useMutation({
     mutationFn: () => api.visits.visitToday(doctor!.id),
-    onSuccess: (updated) => {
-      queryClient.invalidateQueries({ queryKey: ['doctors'] });
-      queryClient.invalidateQueries({ queryKey: ['stats'] });
-      setForm((f) => ({
-        ...f,
-        apr_visit1: updated.apr_visit1 || f.apr_visit1,
-        apr_visit2: updated.apr_visit2 || f.apr_visit2,
-      }));
-    },
+    onSuccess: invalidate,
+  });
+
+  const recordVisitMutation = useMutation({
+    mutationFn: (date: string) => api.visits.record(doctor!.id, date),
+    onSuccess: () => { invalidate(); setShowDatePicker(false); setNewVisitDate(TODAY); },
+  });
+
+  const clearVisitMutation = useMutation({
+    mutationFn: (visitId: number) => api.visits.clear(doctor!.id, visitId),
+    onSuccess: invalidate,
   });
 
   if (!doctor) return null;
 
   const status = getDoctorStatus(doctor);
   const statusColor = STATUS_COLORS[status];
+  const visits = getAllVisitsSorted(doctor);
 
   const toggleDay = (day: string) => {
     setForm((f) => ({
@@ -85,12 +94,24 @@ export default function DoctorModal({ doctor, onClose }: DoctorModalProps) {
       time: form.time,
       request: form.request,
       note: form.note,
-      apr_visit1: form.apr_visit1 || null,
-      apr_visit2: form.apr_visit2 || null,
-    } as any);
+    });
   };
 
-  const inputClass = 'w-full bg-base border border-line rounded-lg px-3 py-2 text-sm text-content focus:outline-none focus:border-accent';
+  const inputClass =
+    'w-full bg-base border border-line rounded-lg px-3 py-2 text-sm text-content focus:outline-none focus:border-accent';
+
+  // Group visits by month label
+  const groupedVisits: { label: string; items: Visit[] }[] = [];
+  for (const v of visits) {
+    const d = new Date(v.visited_at);
+    const label = d.toLocaleString('en', { month: 'long', year: 'numeric' });
+    const last = groupedVisits[groupedVisits.length - 1];
+    if (last && last.label === label) {
+      last.items.push(v);
+    } else {
+      groupedVisits.push({ label, items: [v] });
+    }
+  }
 
   return (
     <>
@@ -115,91 +136,88 @@ export default function DoctorModal({ doctor, onClose }: DoctorModalProps) {
         </div>
 
         {/* Body */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-4">
-          {/* March Reference */}
-          <div className="bg-surface-2 rounded-lg p-3">
-            <p className="text-xs font-semibold text-muted mb-2 uppercase tracking-wide">March 2026 Reference</p>
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <p className="text-[10px] text-subtle">Visit 1</p>
-                <p className="text-sm text-content">{formatDate(doctor.mar_visit1)}</p>
-              </div>
-              <div>
-                <p className="text-[10px] text-subtle">Visit 2</p>
-                <p className="text-sm text-content">{formatDate(doctor.mar_visit2)}</p>
-              </div>
-            </div>
-          </div>
+        <div className="flex-1 overflow-y-auto p-4 space-y-5">
 
-          {/* April Visits */}
+          {/* ── Visits ── */}
           <div>
-            <p className="text-xs font-semibold text-muted mb-2 uppercase tracking-wide">April 2026 Visits</p>
-
-            {/* Visit 1 */}
-            <div className="mb-3">
-              <label className="text-xs text-muted mb-1 block">Visit 1</label>
-              <div className="flex gap-2">
-                <input
-                  type="date"
-                  value={form.apr_visit1}
-                  onChange={(e) => setForm((f) => ({ ...f, apr_visit1: e.target.value }))}
-                  className="flex-1 bg-base border border-line rounded-lg px-3 py-2 text-sm text-content focus:outline-none focus:border-[#FFD700]"
-                />
-                <button
-                  onClick={() => setForm((f) => ({ ...f, apr_visit1: TODAY }))}
-                  className="px-3 py-2 bg-[#FFD700] text-black text-xs font-bold rounded-lg hover:bg-yellow-400 transition-colors"
-                >
-                  Today
-                </button>
-                {form.apr_visit1 && (
-                  <button
-                    onClick={() => setForm((f) => ({ ...f, apr_visit1: '' }))}
-                    className="px-3 py-2 bg-surface-2 text-muted text-xs rounded-lg hover:bg-line transition-colors"
-                  >
-                    ✕
-                  </button>
-                )}
-              </div>
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-xs font-semibold text-muted uppercase tracking-wide">
+                Visit History ({visits.length})
+              </p>
+              <button
+                onClick={() => visitTodayMutation.mutate()}
+                disabled={visitTodayMutation.isPending}
+                className="text-[11px] bg-accent/20 border border-accent/30 text-accent px-3 py-1 rounded-lg font-semibold hover:bg-accent/30 transition-colors disabled:opacity-50"
+              >
+                {visitTodayMutation.isPending ? '...' : '⚡ Visit Today'}
+              </button>
             </div>
 
-            {/* Visit 2 */}
-            <div>
-              <label className="text-xs text-muted mb-1 block">Visit 2</label>
-              <div className="flex gap-2">
+            {/* Visits list */}
+            {visits.length === 0 ? (
+              <p className="text-xs text-muted italic py-2">No visits recorded yet.</p>
+            ) : (
+              <div className="space-y-3">
+                {groupedVisits.map(({ label, items }) => (
+                  <div key={label}>
+                    <p className="text-[10px] font-bold text-subtle uppercase tracking-wider mb-1">{label}</p>
+                    <div className="space-y-1">
+                      {items.map((v) => (
+                        <div
+                          key={v.id}
+                          className="flex items-center justify-between bg-surface-2 rounded-lg px-3 py-2"
+                        >
+                          <span className="text-sm text-content">{formatDate(v.visited_at)}</span>
+                          <button
+                            onClick={() => clearVisitMutation.mutate(v.id)}
+                            disabled={clearVisitMutation.isPending && clearVisitMutation.variables === v.id}
+                            className="text-xs text-muted hover:text-red-400 transition-colors px-1 disabled:opacity-40"
+                            title="Delete visit"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Add specific date */}
+            {showDatePicker ? (
+              <div className="mt-3 flex gap-2">
                 <input
                   type="date"
-                  value={form.apr_visit2}
-                  onChange={(e) => setForm((f) => ({ ...f, apr_visit2: e.target.value }))}
-                  className="flex-1 bg-base border border-line rounded-lg px-3 py-2 text-sm text-content focus:outline-none focus:border-[#00A550]"
+                  value={newVisitDate}
+                  onChange={(e) => setNewVisitDate(e.target.value)}
+                  className="flex-1 bg-base border border-line rounded-lg px-3 py-2 text-sm text-content focus:outline-none focus:border-accent"
                 />
                 <button
-                  onClick={() => setForm((f) => ({ ...f, apr_visit2: TODAY }))}
-                  className="px-3 py-2 bg-[#00A550] text-white text-xs font-bold rounded-lg hover:bg-green-600 transition-colors"
+                  onClick={() => recordVisitMutation.mutate(newVisitDate)}
+                  disabled={!newVisitDate || recordVisitMutation.isPending}
+                  className="px-3 py-2 bg-accent text-on-accent text-xs font-bold rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50"
                 >
-                  Today
+                  {recordVisitMutation.isPending ? '...' : 'Add'}
                 </button>
-                {form.apr_visit2 && (
-                  <button
-                    onClick={() => setForm((f) => ({ ...f, apr_visit2: '' }))}
-                    className="px-3 py-2 bg-surface-2 text-muted text-xs rounded-lg hover:bg-line transition-colors"
-                  >
-                    ✕
-                  </button>
-                )}
+                <button
+                  onClick={() => setShowDatePicker(false)}
+                  className="px-3 py-2 bg-surface-2 text-muted text-xs rounded-lg hover:bg-line transition-colors"
+                >
+                  ✕
+                </button>
               </div>
-            </div>
-
-            {/* Quick visit */}
-            <button
-              onClick={() => visitTodayMutation.mutate()}
-              disabled={visitTodayMutation.isPending}
-              className="mt-3 w-full py-2 bg-accent/20 border border-accent/40 text-accent text-sm font-semibold rounded-lg hover:bg-accent/30 transition-colors disabled:opacity-50"
-            >
-              {visitTodayMutation.isPending ? 'Recording...' : '⚡ Quick Visit Today'}
-            </button>
+            ) : (
+              <button
+                onClick={() => setShowDatePicker(true)}
+                className="mt-3 w-full py-2 border border-dashed border-line text-xs text-muted rounded-lg hover:border-accent hover:text-accent transition-colors"
+              >
+                + Add specific date
+              </button>
+            )}
           </div>
 
-          {/* Class */}
+          {/* ── Class ── */}
           <div>
             <label className="text-xs text-muted mb-1 block">Class</label>
             <select
@@ -214,19 +232,29 @@ export default function DoctorModal({ doctor, onClose }: DoctorModalProps) {
             </select>
           </div>
 
-          {/* Phone */}
+          {/* ── Phone ── */}
           <div>
             <label className="text-xs text-muted mb-1 block">Phone</label>
-            <input type="tel" value={form.phone} onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))} className={inputClass} />
+            <input
+              type="tel"
+              value={form.phone}
+              onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
+              className={inputClass}
+            />
           </div>
 
-          {/* Location */}
+          {/* ── Location ── */}
           <div>
             <label className="text-xs text-muted mb-1 block">Location / Clinic</label>
-            <input type="text" value={form.location} onChange={(e) => setForm((f) => ({ ...f, location: e.target.value }))} className={inputClass} />
+            <input
+              type="text"
+              value={form.location}
+              onChange={(e) => setForm((f) => ({ ...f, location: e.target.value }))}
+              className={inputClass}
+            />
           </div>
 
-          {/* Days */}
+          {/* ── Days ── */}
           <div>
             <label className="text-xs text-muted mb-2 block">Days Available</label>
             <div className="flex gap-2 flex-wrap">
@@ -246,22 +274,38 @@ export default function DoctorModal({ doctor, onClose }: DoctorModalProps) {
             </div>
           </div>
 
-          {/* Time */}
+          {/* ── Time ── */}
           <div>
             <label className="text-xs text-muted mb-1 block">Time</label>
-            <input type="text" value={form.time} onChange={(e) => setForm((f) => ({ ...f, time: e.target.value }))} placeholder="e.g. 9am-1pm" className={inputClass} />
+            <input
+              type="text"
+              value={form.time}
+              onChange={(e) => setForm((f) => ({ ...f, time: e.target.value }))}
+              placeholder="e.g. 9am-1pm"
+              className={inputClass}
+            />
           </div>
 
-          {/* Request */}
+          {/* ── Request ── */}
           <div>
             <label className="text-xs text-muted mb-1 block">Products / Request</label>
-            <input type="text" value={form.request} onChange={(e) => setForm((f) => ({ ...f, request: e.target.value }))} className={inputClass} />
+            <input
+              type="text"
+              value={form.request}
+              onChange={(e) => setForm((f) => ({ ...f, request: e.target.value }))}
+              className={inputClass}
+            />
           </div>
 
-          {/* Note */}
+          {/* ── Note ── */}
           <div>
             <label className="text-xs text-muted mb-1 block">Note</label>
-            <textarea value={form.note} onChange={(e) => setForm((f) => ({ ...f, note: e.target.value }))} rows={3} className={`${inputClass} resize-none`} />
+            <textarea
+              value={form.note}
+              onChange={(e) => setForm((f) => ({ ...f, note: e.target.value }))}
+              rows={3}
+              className={`${inputClass} resize-none`}
+            />
           </div>
         </div>
 
