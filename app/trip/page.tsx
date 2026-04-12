@@ -28,7 +28,7 @@ export default function TripPage() {
     const locs = doctors
       .filter((d) => d.area === area && d.location?.trim())
       .map((d) => d.location.trim());
-    return [...new Set(locs)].sort();
+    return Array.from(new Set(locs)).sort();
   }, [doctors, area]);
 
   const filtered = useMemo(() => {

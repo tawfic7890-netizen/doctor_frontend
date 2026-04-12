@@ -16,8 +16,15 @@ const DAY_LABELS: Record<string, string> = {
   mon: 'Monday', tue: 'Tuesday', wed: 'Wednesday',
   thu: 'Thursday', fri: 'Friday', sat: 'Saturday',
 };
-const DAY_MAP: Record<string, string> = {
-  0: 'sun', 1: 'mon', 2: 'tue', 3: 'wed', 4: 'thu', 5: 'fri', 6: 'sat',
+const TODAY_KEY = (() => {
+  const map: Record<number, string> = {
+    0: 'sun', 1: 'mon', 2: 'tue', 3: 'wed', 4: 'thu', 5: 'fri', 6: 'sat',
+  };
+  return map[new Date().getDay()] ?? 'mon';
+})();
+// Maps URL key ('mon') → the abbreviation stored in doctor.days ('Mon')
+const DAY_ABBREV: Record<string, string> = {
+  mon: 'Mon', tue: 'Tue', wed: 'Wed', thu: 'Thu', fri: 'Fri', sat: 'Sat',
 };
 
 export default function DailyPlanPage({ params }: Props) {
@@ -32,12 +39,11 @@ export default function DailyPlanPage({ params }: Props) {
   const [statusFilter, setStatusFilter] = useState('');   // '' | 'NEED_VISIT' | 'NEVER' | 'CURRENT_MONTH' | 'DEAL'
   const [filterByDay, setFilterByDay] = useState(true);   // only show doctors available on this day
 
-  let day = params.day.toLowerCase();
-  if (day === 'today') day = DAY_MAP[new Date().getDay()] || 'mon';
-  const dayLabel = DAY_LABELS[day] || day;
+  const rawDay = params.day.toLowerCase();
+  const day = rawDay === 'today' ? TODAY_KEY : rawDay;
+  const dayLabel = DAY_LABELS[day] ?? day;
+  const dayAbbrev = DAY_ABBREV[day] ?? day;
   const monthName = getCurrentMonthName();
-  // Map URL param ('mon') → day abbreviation used in doctor.days ('Mon')
-  const dayAbbrev = day.charAt(0).toUpperCase() + day.slice(1);
 
   // Load plan from API
   const { data: planData, isLoading: planLoading } = useQuery({
@@ -53,10 +59,11 @@ export default function DailyPlanPage({ params }: Props) {
     }
   }, [planData]);
 
-  // Reset edit state when day changes
+  // Reset all edit state when navigating to a different day
   useEffect(() => {
     setEditing(false);
     setSearch(''); setArea(''); setSubLocation('');
+    setStatusFilter(''); setFilterByDay(true);
   }, [day]);
 
   const savePlanMutation = useMutation({
@@ -100,7 +107,7 @@ export default function DailyPlanPage({ params }: Props) {
     const locs = allDoctors
       .filter((d) => d.area === area && d.class?.toLowerCase() !== 'f' && d.location?.trim())
       .map((d) => d.location.trim());
-    return [...new Set(locs)].sort();
+    return Array.from(new Set(locs)).sort();
   }, [allDoctors, area]);
 
   // Doctors shown in edit mode (exclude F, apply all active filters)
@@ -153,7 +160,7 @@ export default function DailyPlanPage({ params }: Props) {
 
   function saveEdit() {
     const prev = plannedIds.filter((id) => editSelection.has(id));
-    const added = [...editSelection].filter((id) => !plannedIds.includes(id));
+    const added = Array.from(editSelection).filter((id) => !plannedIds.includes(id));
     const ids = [...prev, ...added];
     savePlanMutation.mutate(ids);
   }

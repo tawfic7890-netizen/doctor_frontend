@@ -2,7 +2,15 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
-import { Doctor, formatDate, getAprilStatus } from '@/lib/utils';
+import { Doctor, Visit, formatDate } from '@/lib/utils';
+
+const MARCH_PREFIX = '2026-03';
+
+function getMarchVisits(doctor: Doctor): Visit[] {
+  return (doctor.visits ?? [])
+    .filter((v) => v.visited_at.startsWith(MARCH_PREFIX))
+    .sort((a, b) => a.visited_at.localeCompare(b.visited_at));
+}
 
 export default function MarchPage() {
   const [search, setSearch] = useState('');
@@ -12,9 +20,9 @@ export default function MarchPage() {
     queryFn: () => api.doctors.list({ hideF: false }),
   });
 
-  const visited = doctors.filter((d) => d.mar_visit1 || d.mar_visit2);
+  const visited = doctors.filter((d) => getMarchVisits(d).length > 0);
   const notVisited = doctors.filter(
-    (d) => !d.mar_visit1 && !d.mar_visit2 && d.class?.toLowerCase() !== 'f',
+    (d) => getMarchVisits(d).length === 0 && d.class?.toLowerCase() !== 'f',
   );
 
   const filterDocs = (list: Doctor[]) => {
@@ -78,23 +86,27 @@ export default function MarchPage() {
               ✅ Visited in March ({visitedFiltered.length})
             </h2>
             <div className="space-y-2">
-              {visitedFiltered.map((d) => (
-                <div
-                  key={d.id}
-                  className="bg-[#111827] border border-gray-800 rounded-xl px-4 py-3 flex justify-between items-center"
-                >
-                  <div>
-                    <p className="text-sm font-medium text-white">{d.name}</p>
-                    <p className="text-xs text-gray-400">{d.specialty} · {d.area}</p>
+              {visitedFiltered.map((d) => {
+                const mv = getMarchVisits(d);
+                return (
+                  <div
+                    key={d.id}
+                    className="bg-[#111827] border border-gray-800 rounded-xl px-4 py-3 flex justify-between items-center"
+                  >
+                    <div>
+                      <p className="text-sm font-medium text-white">{d.name}</p>
+                      <p className="text-xs text-gray-400">{d.specialty} · {d.area}</p>
+                    </div>
+                    <div className="text-right">
+                      {mv.map((v, i) => (
+                        <p key={v.id} className="text-xs text-gray-500">
+                          V{i + 1}: {formatDate(v.visited_at)}
+                        </p>
+                      ))}
+                    </div>
                   </div>
-                  <div className="text-right">
-                    <p className="text-xs text-gray-500">V1: {formatDate(d.mar_visit1)}</p>
-                    {d.mar_visit2 && (
-                      <p className="text-xs text-gray-500">V2: {formatDate(d.mar_visit2)}</p>
-                    )}
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         )}
