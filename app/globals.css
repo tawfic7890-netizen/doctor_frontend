@@ -1,0 +1,93 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ─── Medical Color Tokens (RGB channels — supports Tailwind opacity modifiers) ─── */
+
+:root {
+  /* Light mode — clinical white/blue */
+  --c-base:       240 246 252;   /* #f0f6fc — very light blue-white */
+  --c-surface:    255 255 255;   /* #ffffff — pure white */
+  --c-surface-2:  226 238 248;   /* #e2eef8 — secondary inputs */
+  --c-line:       196 220 238;   /* #c4dced — soft blue border */
+  --c-content:    10  28  50;    /* #0a1c32 — deep navy text */
+  --c-muted:      74  112 150;   /* #4a7096 — blue-gray secondary */
+  --c-subtle:     144 174 200;   /* #90aec8 — very muted */
+  --c-accent:     0   119 182;   /* #0077b6 — medical blue (WHO / hospital) */
+  --c-on-accent:  255 255 255;   /* #ffffff — text on accent */
+}
+
+.dark {
+  /* Dark mode — deep navy */
+  --c-base:       10  14  26;    /* #0a0e1a */
+  --c-surface:    17  24  39;    /* #111827 */
+  --c-surface-2:  26  35  52;    /* #1a2334 */
+  --c-line:       31  41  55;    /* #1f2937 */
+  --c-content:    226 234 244;   /* #e2eaf4 */
+  --c-muted:      107 130 160;   /* #6b82a0 */
+  --c-subtle:     61  80  104;   /* #3d5068 */
+  --c-accent:     0   212 255;   /* #00d4ff — teal */
+  --c-on-accent:  0   0   0;     /* #000000 */
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body {
+  background-color: rgb(var(--c-base));
+  color: rgb(var(--c-content));
+  font-family: 'Inter', system-ui, sans-serif;
+  min-height: 100vh;
+}
+
+/* ─── Scrollbar ─── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: rgb(var(--c-surface)); }
+::-webkit-scrollbar-thumb { background: rgb(var(--c-line)); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: rgb(var(--c-muted)); }
+
+/* ─── Status dot animations ─── */
+@keyframes pulse-red {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 61, 61, 0.4); }
+  50%       { box-shadow: 0 0 0 6px rgba(255, 61, 61, 0); }
+}
+@keyframes pulse-deal {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.5); }
+  50%       { box-shadow: 0 0 0 8px rgba(245, 158, 11, 0); }
+}
+
+.status-dot-never { animation: pulse-red 2s infinite; }
+.status-dot-deal  { animation: pulse-deal 1.5s infinite; }
+
+/* ─── Doctor card hover ─── */
+.doctor-card {
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.doctor-card:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 20px rgb(var(--c-accent) / 0.12);
+}
+
+/* ─── Bottom nav safe area ─── */
+.bottom-nav {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* ─── Native date/select inputs — respect theme ─── */
+input[type="date"],
+select {
+  color-scheme: dark;
+}
+
+.dark input[type="date"],
+.dark select {
+  color-scheme: dark;
+}
+
+:not(.dark) input[type="date"],
+:not(.dark) select {
+  color-scheme: light;
+}
