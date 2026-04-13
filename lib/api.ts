@@ -74,6 +74,10 @@ export const api = {
     /** Delete a specific visit by its ID */
     clear: (doctorId: number, visitId: number) =>
       req<void>(`/doctors/${doctorId}/visits/${visitId}`, { method: 'DELETE' }),
+
+    /** Returns the URL for downloading visits as CSV (open in browser / anchor href) */
+    exportUrl: (month?: string) =>
+      `${BASE}/visits/export${month ? `?month=${month}` : ''}`,
   },
 
   plans: {

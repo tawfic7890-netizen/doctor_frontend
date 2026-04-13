@@ -5,6 +5,11 @@ import StatsCard from '@/components/StatsCard';
 import { api } from '@/lib/api';
 import { DAYS } from '@/lib/utils';
 
+function currentMonthPrefix() {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+}
+
 export default function Dashboard() {
   const { data: stats, isLoading } = useQuery({
     queryKey: ['stats'],
@@ -138,6 +143,31 @@ export default function Dashboard() {
                 {day}
               </Link>
             ))}
+          </div>
+        </div>
+
+        {/* Export */}
+        <div>
+          <h2 className="text-sm font-semibold text-muted uppercase tracking-wide mb-3">Export</h2>
+          <div className="grid grid-cols-2 gap-2">
+            <a
+              href={api.visits.exportUrl(currentMonthPrefix())}
+              download
+              className="bg-surface border border-line rounded-xl p-4 flex flex-col items-center gap-2 hover:border-subtle transition-colors"
+            >
+              <span className="text-2xl">📥</span>
+              <span className="text-sm font-semibold text-content">This Month</span>
+              <span className="text-xs text-muted">CSV download</span>
+            </a>
+            <a
+              href={api.visits.exportUrl()}
+              download
+              className="bg-surface border border-line rounded-xl p-4 flex flex-col items-center gap-2 hover:border-subtle transition-colors"
+            >
+              <span className="text-2xl">📊</span>
+              <span className="text-sm font-semibold text-content">All Visits</span>
+              <span className="text-xs text-muted">CSV download</span>
+            </a>
           </div>
         </div>
 
