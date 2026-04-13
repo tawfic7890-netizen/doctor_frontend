@@ -1,4 +1,4 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import './globals.css';
 import { Providers } from '@/components/Providers';
 import BottomNav from '@/components/BottomNav';
@@ -7,7 +7,12 @@ import ThemeToggle from '@/components/ThemeToggle';
 export const metadata: Metadata = {
   title: 'Tawfic Tracker',
   description: 'Doctor visit tracker for North Lebanon',
-  viewport: 'width=device-width, initial-scale=1, maximum-scale=1',
+};
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
