@@ -30,11 +30,13 @@ export default function DoctorModal({ doctor, onClose }: DoctorModalProps) {
 
   const [newVisitDate, setNewVisitDate] = useState(TODAY);
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   useEffect(() => {
     if (doctor) {
       setForm({
-        class: doctor.class || '',
+        class: doctor.class || 'B',
         phone: doctor.phone || '',
         location: doctor.location || '',
         days: Array.isArray(doctor.days) ? doctor.days : [],
@@ -44,6 +46,8 @@ export default function DoctorModal({ doctor, onClose }: DoctorModalProps) {
       });
       setNewVisitDate(TODAY);
       setShowDatePicker(false);
+      setConfirmDelete(false);
+      setSaveError(null);
     }
   }, [doctor]);
 
@@ -55,6 +59,7 @@ export default function DoctorModal({ doctor, onClose }: DoctorModalProps) {
   const updateMutation = useMutation({
     mutationFn: (data: Partial<Doctor>) => api.doctors.update(doctor!.id, data),
     onSuccess: () => { invalidate(); onClose(); },
+    onError: (e: any) => setSaveError(e.message || 'Failed to save changes'),
   });
 
   const visitTodayMutation = useMutation({
@@ -72,6 +77,11 @@ export default function DoctorModal({ doctor, onClose }: DoctorModalProps) {
     onSuccess: invalidate,
   });
 
+  const deleteMutation = useMutation({
+    mutationFn: () => api.doctors.delete(doctor!.id),
+    onSuccess: () => { invalidate(); onClose(); },
+  });
+
   if (!doctor) return null;
 
   const status = getDoctorStatus(doctor);
@@ -86,14 +96,15 @@ export default function DoctorModal({ doctor, onClose }: DoctorModalProps) {
   };
 
   const handleSave = () => {
+    setSaveError(null);
     updateMutation.mutate({
-      class: form.class,
-      phone: form.phone,
-      location: form.location,
-      days: form.days,
-      time: form.time,
-      request: form.request,
-      note: form.note,
+      class:    form.class    || undefined,
+      phone:    form.phone    || undefined,
+      location: form.location || undefined,
+      days:     form.days,
+      time:     form.time     || undefined,
+      request:  form.request  || undefined,
+      note:     form.note     || undefined,
     });
   };
 
@@ -119,7 +130,7 @@ export default function DoctorModal({ doctor, onClose }: DoctorModalProps) {
       <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50" onClick={onClose} />
 
       {/* Panel */}
-      <div className="fixed bottom-0 left-0 right-0 md:right-0 md:top-0 md:left-auto md:w-[420px] bg-surface border-t md:border-t-0 md:border-l border-line z-50 flex flex-col max-h-[92vh] md:max-h-screen rounded-t-2xl md:rounded-none overflow-hidden">
+      <div className="fixed bottom-14 left-0 right-0 md:bottom-0 md:right-0 md:top-0 md:left-auto md:w-[420px] bg-surface border-t md:border-t-0 md:border-l border-line z-50 flex flex-col max-h-[calc(92vh-56px)] md:max-h-screen rounded-t-2xl md:rounded-none overflow-hidden">
         {/* Header */}
         <div className="flex items-center gap-3 p-4 border-b border-line flex-shrink-0">
           <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: statusColor }} />
@@ -310,20 +321,51 @@ export default function DoctorModal({ doctor, onClose }: DoctorModalProps) {
         </div>
 
         {/* Footer */}
-        <div className="p-4 border-t border-line flex-shrink-0 flex gap-3">
-          <button
-            onClick={onClose}
-            className="flex-1 py-3 bg-surface-2 text-content text-sm font-semibold rounded-xl hover:bg-line transition-colors"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleSave}
-            disabled={updateMutation.isPending}
-            className="flex-1 py-3 bg-accent text-on-accent text-sm font-bold rounded-xl hover:opacity-90 transition-opacity disabled:opacity-50"
-          >
-            {updateMutation.isPending ? 'Saving...' : 'Save Changes'}
-          </button>
+        <div className="p-4 border-t border-line flex-shrink-0 space-y-2">
+          {saveError && (
+            <p className="text-xs text-red-400 text-center pb-1">{saveError}</p>
+          )}
+          {confirmDelete ? (
+            <div className="flex gap-2">
+              <button
+                onClick={() => setConfirmDelete(false)}
+                className="flex-1 py-3 bg-surface-2 text-content text-sm font-semibold rounded-xl hover:bg-line transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => deleteMutation.mutate()}
+                disabled={deleteMutation.isPending}
+                className="flex-1 py-3 bg-red-600 text-white text-sm font-bold rounded-xl hover:bg-red-700 transition-colors disabled:opacity-50"
+              >
+                {deleteMutation.isPending ? 'Deleting...' : 'Confirm Delete'}
+              </button>
+            </div>
+          ) : (
+            <div className="flex gap-3">
+              <button
+                onClick={onClose}
+                className="flex-1 py-3 bg-surface-2 text-content text-sm font-semibold rounded-xl hover:bg-line transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSave}
+                disabled={updateMutation.isPending}
+                className="flex-1 py-3 bg-accent text-on-accent text-sm font-bold rounded-xl hover:opacity-90 transition-opacity disabled:opacity-50"
+              >
+                {updateMutation.isPending ? 'Saving...' : 'Save Changes'}
+              </button>
+            </div>
+          )}
+          {!confirmDelete && (
+            <button
+              onClick={() => setConfirmDelete(true)}
+              className="w-full py-2.5 text-red-400 text-sm font-semibold rounded-xl border border-red-400/30 hover:bg-red-500/10 transition-colors"
+            >
+              Delete Doctor
+            </button>
+          )}
         </div>
       </div>
     </>
