@@ -1,5 +1,5 @@
 'use client';
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, Suspense } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useSearchParams } from 'next/navigation';
 import { api } from '@/lib/api';
@@ -45,7 +45,7 @@ const IconSearch = ({ size = 14 }: { size?: number }) => (
   </svg>
 );
 
-export default function TripPage() {
+function TripPageInner() {
   const searchParams  = useSearchParams();
   const planDate      = searchParams.get('plan'); // YYYY-MM-DD or null
 
@@ -362,5 +362,13 @@ export default function TripPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function TripPage() {
+  return (
+    <Suspense>
+      <TripPageInner />
+    </Suspense>
   );
 }

@@ -305,7 +305,14 @@ export default function DoctorModal({ doctor, onClose }: DoctorModalProps) {
                   <button
                     key={c}
                     type="button"
-                    onClick={() => setForm((f) => ({ ...f, city: f.city === c ? '' : c }))}
+                    onClick={() => setForm((f) => {
+                      const newCity = f.city === c ? '' : c;
+                      const prevAuto = f.city ? `${doctor.area}, ${f.city}` : '';
+                      const newLocation = (!f.location || f.location === prevAuto)
+                        ? (newCity ? `${doctor.area}, ${newCity}` : '')
+                        : f.location;
+                      return { ...f, city: newCity, location: newLocation };
+                    })}
                     className={`text-xs px-2.5 py-1 rounded-full border font-medium transition-all ${
                       form.city === c
                         ? 'border-transparent text-on-accent'
@@ -322,7 +329,16 @@ export default function DoctorModal({ doctor, onClose }: DoctorModalProps) {
             <input
               type="text"
               value={form.city}
-              onChange={(e) => setForm((f) => ({ ...f, city: e.target.value }))}
+              onChange={(e) => {
+                const newCity = e.target.value;
+                setForm((f) => {
+                  const prevAuto = f.city ? `${doctor.area}, ${f.city}` : '';
+                  const newLocation = (!f.location || f.location === prevAuto)
+                    ? (newCity ? `${doctor.area}, ${newCity}` : '')
+                    : f.location;
+                  return { ...f, city: newCity, location: newLocation };
+                });
+              }}
               placeholder="Or type a city…"
               className={inputClass}
             />

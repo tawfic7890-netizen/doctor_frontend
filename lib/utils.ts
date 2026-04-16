@@ -213,7 +213,13 @@ export const AREAS = [
 /** Known cities / towns per area. Free-text entry is always allowed in addition. */
 export const CITIES: Record<string, string[]> = {
   Tripoli: ['Tripoli', 'Al Mina', 'Al Qobbeh', 'Bab el Tabbaneh', 'Zahrieh', 'Abu Samra', 'Baddawi'],
-  Akkar:   ['Halba', 'Abde', 'Koubayat', 'Fneidek', 'Bebnine', 'Sir', 'Akkar el Atika', 'Minyara', 'Rahbe'],
+  Akkar:   [
+    'Halba', 'Abde', 'Koubayat', 'Fneidek', 'Bebnine', 'Sir', 'Akkar el Atika',
+    'Minyara', 'Rahbe', 'Qobaiyat', 'Andaqt', 'Bireh', 'Chadra', 'Dweir',
+    'Fakiha', 'Hanouiyeh', 'Jousieh', 'Khirbet Daoud', 'Knaisse', 'Machha',
+    'Mansourieh', 'Masharih', 'Mashta Hassan', 'Mrah', 'Nahleh', 'Qayteh',
+    'Safra', 'Tal Abbas', 'Tikrit', 'Wadi Khaled', 'Zeitouneh',
+  ],
   Koura:   ['Amioun', 'Kousba', 'Btourram', 'Barsa', 'Ras Maska', 'Hamat', 'Kfar Hazir'],
   Batroun: ['Batroun', 'Tannourine', 'Douma', 'Hamat', 'Kfar Helda'],
   Zgharta: ['Zgharta', 'Ehden', 'Miziara', 'Kfarsghab'],

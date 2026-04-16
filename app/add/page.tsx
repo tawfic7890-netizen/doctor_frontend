@@ -281,7 +281,15 @@ export default function AddDoctorPage() {
                     <button
                       key={c}
                       type="button"
-                      onClick={() => set('city', form.city === c ? '' : c)}
+                      onClick={() => {
+                        const newCity = form.city === c ? '' : c;
+                        set('city', newCity);
+                        // Auto-fill location if empty or still matches the previous auto-fill
+                        const prevAuto = form.city ? `${form.area}, ${form.city}` : '';
+                        if (!form.location || form.location === prevAuto) {
+                          set('location', newCity ? `${form.area}, ${newCity}` : '');
+                        }
+                      }}
                       className={`text-xs px-2.5 py-1 rounded-full border font-medium transition-all ${
                         form.city === c
                           ? 'border-transparent text-on-accent'
@@ -298,7 +306,14 @@ export default function AddDoctorPage() {
               <input
                 type="text"
                 value={form.city}
-                onChange={(e) => set('city', e.target.value)}
+                onChange={(e) => {
+                  const newCity = e.target.value;
+                  const prevAuto = form.city ? `${form.area}, ${form.city}` : '';
+                  set('city', newCity);
+                  if (!form.location || form.location === prevAuto) {
+                    set('location', newCity ? `${form.area}, ${newCity}` : '');
+                  }
+                }}
                 placeholder="Or type a city…"
                 className={inputClass}
               />
