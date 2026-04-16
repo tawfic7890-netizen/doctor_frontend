@@ -1,20 +1,42 @@
 import { Doctor, Visit } from './utils';
+import { getToken, clearToken } from './auth';
 
 const BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
 async function req<T>(path: string, options?: RequestInit): Promise<T> {
+  const token = getToken();
   const res = await fetch(`${BASE}${path}`, {
-    headers: { 'Content-Type': 'application/json' },
     ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(options?.headers ?? {}),
+    },
   });
+
+  // Token expired or invalid — clear it and redirect to login
+  if (res.status === 401) {
+    clearToken();
+    if (typeof window !== 'undefined') window.location.href = '/login';
+    throw new Error('Session expired. Please log in again.');
+  }
+
   if (!res.ok) {
     const text = await res.text();
     throw new Error(`API error ${res.status}: ${text}`);
   }
-  // 204 No Content — nothing to parse
   if (res.status === 204) return undefined as unknown as T;
   return res.json();
 }
+
+// --- Auth ---
+export const authApi = {
+  login: (email: string, password: string) =>
+    req<{ access_token: string; user: { id: string; email: string } }>(
+      '/auth/login',
+      { method: 'POST', body: JSON.stringify({ email, password }) },
+    ),
+};
 
 // --- Doctors ---
 
@@ -75,27 +97,53 @@ export const api = {
     clear: (doctorId: number, visitId: number) =>
       req<void>(`/doctors/${doctorId}/visits/${visitId}`, { method: 'DELETE' }),
 
-    /** Returns the URL for downloading visits as CSV (open in browser / anchor href) */
-    exportUrl: (month?: string) =>
-      `${BASE}/visits/export${month ? `?month=${month}` : ''}`,
+    /**
+     * Returns the URL for downloading visits as CSV.
+     * Pass { date: 'YYYY-MM-DD' } for a single day,
+     *      { month: 'YYYY-MM' }  for a whole month,
+     *      nothing               for all visits.
+     */
+    exportUrl: (params?: { date?: string; month?: string }) => {
+      if (!params) return `${BASE}/visits/export`;
+      if (params.date)  return `${BASE}/visits/export?date=${params.date}`;
+      if (params.month) return `${BASE}/visits/export?month=${params.month}`;
+      return `${BASE}/visits/export`;
+    },
   },
 
   plans: {
-    /** Get the planned doctor IDs for a specific day */
-    get: (day: string) => req<Plan>(`/plans/${day}`),
+    /** Get the plan for a specific date (YYYY-MM-DD) */
+    get: (date: string) => req<Plan>(`/plans/${date}`),
 
-    /** Get plans for all days */
+    /** Get all saved plans */
     getAll: () => req<Plan[]>('/plans'),
 
-    /** Save the planned doctor IDs for a specific day */
-    set: (day: string, doctorIds: number[]) =>
-      req<Plan>(`/plans/${day}`, {
+    /**
+     * Get plans for the Mon–Sat week containing date.
+     * Defaults to the current week when date is omitted.
+     */
+    getWeek: (date?: string) =>
+      req<Plan[]>(`/plans/week${date ? `?date=${date}` : ''}`),
+
+    /** Save the planned doctor IDs for a specific date (YYYY-MM-DD) */
+    set: (date: string, doctorIds: number[]) =>
+      req<Plan>(`/plans/${date}`, {
         method: 'PUT',
         body: JSON.stringify({ doctorIds }),
       }),
   },
 
   stats: {
+    history: (months = 6) =>
+      req<Array<{
+        month: string;
+        label: string;
+        visited: number;
+        totalActive: number;
+        coverage: number;
+        isCurrent: boolean;
+      }>>(`/stats/history?months=${months}`),
+
     get: () =>
       req<{
         total: number;

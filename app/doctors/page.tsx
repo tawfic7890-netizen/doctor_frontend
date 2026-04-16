@@ -58,9 +58,20 @@ export default function DoctorsPage() {
 
   return (
     <div className="min-h-screen bg-base">
-      <div className="bg-surface border-b border-line px-4 py-3 pr-14">
-        <h1 className="text-lg font-bold text-content">Doctors</h1>
-        <p className="text-xs text-muted">{doctors.length} shown</p>
+      <div className="relative overflow-hidden border-b border-line">
+        <div
+          className="absolute inset-0 opacity-40 pointer-events-none"
+          style={{
+            background:
+              'radial-gradient(ellipse at top right, rgb(var(--c-accent) / 0.10) 0%, transparent 55%)',
+          }}
+        />
+        <div className="relative px-5 py-4 pl-14 pr-14">
+          <h1 className="text-xl font-bold text-content tracking-tight">Doctors</h1>
+          <p className="text-xs text-muted mt-0.5">
+            <span className="tabular font-semibold text-content">{doctors.length}</span> {doctors.length === 1 ? 'doctor' : 'doctors'} shown
+          </p>
+        </div>
       </div>
 
       <FilterBar filters={filters} onChange={setFilters} />
@@ -69,23 +80,31 @@ export default function DoctorsPage() {
         {isLoading && (
           <div className="space-y-2">
             {[...Array(8)].map((_, i) => (
-              <div key={i} className="bg-surface rounded-xl h-20 animate-pulse" />
+              <div key={i} className="skeleton rounded-2xl h-[78px]" />
             ))}
           </div>
         )}
 
         {error && (
           <div className="text-center py-12 text-red-400">
-            <p className="text-4xl mb-2">⚠️</p>
-            <p>Failed to load doctors</p>
+            <div className="w-12 h-12 rounded-full bg-red-500/10 border border-red-500/20 flex items-center justify-center mx-auto mb-3">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+              </svg>
+            </div>
+            <p className="font-medium">Failed to load doctors</p>
             <p className="text-xs text-muted mt-1">{String(error)}</p>
           </div>
         )}
 
         {!isLoading && !error && doctors.length === 0 && (
           <div className="text-center py-16 text-muted">
-            <p className="text-4xl mb-3">🔍</p>
-            <p className="font-medium">No doctors found</p>
+            <div className="w-12 h-12 rounded-full bg-surface border border-line flex items-center justify-center mx-auto mb-3 text-subtle">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+              </svg>
+            </div>
+            <p className="font-medium text-content">No doctors found</p>
             <p className="text-sm mt-1">Try adjusting your filters</p>
           </div>
         )}

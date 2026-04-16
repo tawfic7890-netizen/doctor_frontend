@@ -2,11 +2,14 @@
 import { useState, useEffect } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
-  Doctor, Visit, AREAS, DAYS,
+  Doctor, Visit, AREAS, CITIES, DAYS,
   formatDate, getDoctorStatus, STATUS_COLORS,
-  getAllVisitsSorted,
+  getAllVisitsSorted, extractLatLng,
 } from '@/lib/utils';
+import { getClasses, ClassDef } from '@/lib/classConfig';
 import { api } from '@/lib/api';
+import MapPickerModal from '@/components/MapPickerModal';
+import ClassManagerModal from '@/components/ClassManagerModal';
 
 interface DoctorModalProps {
   doctor: Doctor | null;
@@ -21,24 +24,31 @@ export default function DoctorModal({ doctor, onClose }: DoctorModalProps) {
   const [form, setForm] = useState({
     class: '',
     phone: '',
+    city: '',
     location: '',
+    maps_url: '',
     days: [] as string[],
     time: '',
     request: '',
     note: '',
   });
+  const [classDefs, setClassDefs] = useState<ClassDef[]>(() => getClasses());
+  const [classManagerOpen, setClassManagerOpen] = useState(false);
 
   const [newVisitDate, setNewVisitDate] = useState(TODAY);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
 
   useEffect(() => {
     if (doctor) {
       setForm({
         class: doctor.class || 'B',
         phone: doctor.phone || '',
+        city: doctor.city || '',
         location: doctor.location || '',
+        maps_url: doctor.maps_url || '',
         days: Array.isArray(doctor.days) ? doctor.days : [],
         time: doctor.time || '',
         request: doctor.request || '',
@@ -98,14 +108,16 @@ export default function DoctorModal({ doctor, onClose }: DoctorModalProps) {
   const handleSave = () => {
     setSaveError(null);
     updateMutation.mutate({
-      class:    form.class    || undefined,
-      phone:    form.phone    || undefined,
-      location: form.location || undefined,
+      class:    form.class           || undefined,
+      phone:    form.phone           || null,
+      city:     form.city.trim()     || null,
+      location: form.location        || null,
+      maps_url: form.maps_url.trim() || null,
       days:     form.days,
-      time:     form.time     || undefined,
-      request:  form.request  || undefined,
-      note:     form.note     || undefined,
-    });
+      time:     form.time            || null,
+      request:  form.request         || null,
+      note:     form.note            || null,
+    } as any);
   };
 
   const inputClass =
@@ -127,22 +139,38 @@ export default function DoctorModal({ doctor, onClose }: DoctorModalProps) {
   return (
     <>
       {/* Backdrop */}
-      <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50" onClick={onClose} />
+      <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-50 animate-fade-up" onClick={onClose} />
 
       {/* Panel */}
-      <div className="fixed bottom-14 left-0 right-0 md:bottom-0 md:right-0 md:top-0 md:left-auto md:w-[420px] bg-surface border-t md:border-t-0 md:border-l border-line z-50 flex flex-col max-h-[calc(92vh-56px)] md:max-h-screen rounded-t-2xl md:rounded-none overflow-hidden">
+      <div
+        className="fixed bottom-14 left-0 right-0 md:bottom-0 md:right-0 md:top-0 md:left-auto md:w-[440px] border-t md:border-t-0 md:border-l border-line z-50 flex flex-col max-h-[calc(92vh-56px)] md:max-h-screen rounded-t-2xl md:rounded-none overflow-hidden animate-fade-up"
+        style={{
+          background: 'linear-gradient(180deg, rgb(var(--c-surface)) 0%, rgb(var(--c-base)) 100%)',
+          boxShadow: 'var(--shadow-lg)',
+        }}
+      >
         {/* Header */}
-        <div className="flex items-center gap-3 p-4 border-b border-line flex-shrink-0">
-          <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: statusColor }} />
-          <div className="flex-1 min-w-0">
-            <h2 className="font-bold text-content truncate">{doctor.name}</h2>
+        <div
+          className="relative flex items-center gap-3 p-4 border-b border-line flex-shrink-0 overflow-hidden"
+        >
+          <div
+            className="absolute inset-0 opacity-40 pointer-events-none"
+            style={{
+              background: `radial-gradient(ellipse at top left, ${statusColor}18 0%, transparent 60%)`,
+            }}
+          />
+          <div className="relative w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: statusColor, boxShadow: `0 0 10px ${statusColor}` }} />
+          <div className="relative flex-1 min-w-0">
+            <h2 className="font-bold text-content truncate tracking-tight">{doctor.name}</h2>
             <p className="text-xs text-muted">{doctor.specialty} · {doctor.area}</p>
           </div>
           <button
             onClick={onClose}
-            className="text-muted hover:text-content p-1 rounded-lg hover:bg-surface-2 transition-colors"
+            className="relative w-8 h-8 flex items-center justify-center text-muted hover:text-content rounded-lg hover:bg-surface-2 transition-colors"
           >
-            ✕
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
           </button>
         </div>
 
@@ -158,9 +186,9 @@ export default function DoctorModal({ doctor, onClose }: DoctorModalProps) {
               <button
                 onClick={() => visitTodayMutation.mutate()}
                 disabled={visitTodayMutation.isPending}
-                className="text-[11px] bg-accent/20 border border-accent/30 text-accent px-3 py-1 rounded-lg font-semibold hover:bg-accent/30 transition-colors disabled:opacity-50"
+                className="text-[11px] bg-accent/15 border border-accent/25 text-accent px-3 py-1 rounded-lg font-semibold hover:bg-accent/25 transition-colors disabled:opacity-50"
               >
-                {visitTodayMutation.isPending ? '...' : '⚡ Visit Today'}
+                {visitTodayMutation.isPending ? 'Recording…' : '+ Visit Today'}
               </button>
             </div>
 
@@ -182,10 +210,12 @@ export default function DoctorModal({ doctor, onClose }: DoctorModalProps) {
                           <button
                             onClick={() => clearVisitMutation.mutate(v.id)}
                             disabled={clearVisitMutation.isPending && clearVisitMutation.variables === v.id}
-                            className="text-xs text-muted hover:text-red-400 transition-colors px-1 disabled:opacity-40"
+                            className="text-muted hover:text-red-400 transition-colors p-1 disabled:opacity-40"
                             title="Delete visit"
                           >
-                            ✕
+                            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                            </svg>
                           </button>
                         </div>
                       ))}
@@ -230,17 +260,72 @@ export default function DoctorModal({ doctor, onClose }: DoctorModalProps) {
 
           {/* ── Class ── */}
           <div>
-            <label className="text-xs text-muted mb-1 block">Class</label>
-            <select
-              value={form.class}
-              onChange={(e) => setForm((f) => ({ ...f, class: e.target.value }))}
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="text-xs text-muted">Class</label>
+              <button
+                type="button"
+                onClick={() => setClassManagerOpen(true)}
+                className="text-[11px] text-accent hover:underline flex items-center gap-1"
+              >
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                Manage
+              </button>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {classDefs.map((c) => {
+                const active = form.class === c.value;
+                return (
+                  <button
+                    key={c.value}
+                    type="button"
+                    onClick={() => setForm((f) => ({ ...f, class: c.value }))}
+                    className={`flex-1 min-w-[60px] py-2 rounded-lg text-xs font-bold border transition-all ${
+                      active ? 'border-transparent' : 'bg-base text-muted border-line hover:border-line-2'
+                    }`}
+                    style={active ? {
+                      background: c.color,
+                      color: 'rgb(var(--c-on-accent))',
+                      boxShadow: `0 4px 12px -2px ${c.color}88`,
+                    } : {}}
+                  >
+                    {c.value}
+                    <span className="block text-[9px] font-normal opacity-80 mt-0.5 truncate">{c.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* ── City ── */}
+          <div>
+            <label className="text-xs text-muted mb-1.5 block">City / Town</label>
+            {(CITIES[doctor.area]?.length ?? 0) > 0 && (
+              <div className="flex flex-wrap gap-1.5 mb-2">
+                {CITIES[doctor.area].map((c) => (
+                  <button
+                    key={c}
+                    type="button"
+                    onClick={() => setForm((f) => ({ ...f, city: f.city === c ? '' : c }))}
+                    className={`text-xs px-2.5 py-1 rounded-full border font-medium transition-all ${
+                      form.city === c
+                        ? 'border-transparent text-on-accent'
+                        : 'bg-base text-muted border-line hover:border-line-2'
+                    }`}
+                    style={form.city === c ? {
+                      background: 'linear-gradient(135deg, rgb(var(--c-accent)), rgb(var(--c-accent-2)))',
+                      boxShadow: '0 4px 10px -2px rgb(var(--c-accent) / 0.45)',
+                    } : {}}
+                  >{c}</button>
+                ))}
+              </div>
+            )}
+            <input
+              type="text"
+              value={form.city}
+              onChange={(e) => setForm((f) => ({ ...f, city: e.target.value }))}
+              placeholder="Or type a city…"
               className={inputClass}
-            >
-              <option value="A">A — Priority</option>
-              <option value="a">a — Deal Priority</option>
-              <option value="B">B — Normal</option>
-              <option value="F">F — Colleague (Do Not Visit)</option>
-            </select>
+            />
           </div>
 
           {/* ── Phone ── */}
@@ -263,6 +348,75 @@ export default function DoctorModal({ doctor, onClose }: DoctorModalProps) {
               onChange={(e) => setForm((f) => ({ ...f, location: e.target.value }))}
               className={inputClass}
             />
+          </div>
+
+          {/* ── Map location ── */}
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-xs text-muted flex items-center gap-1.5">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-accent">
+                  <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/>
+                </svg>
+                Map Location
+              </label>
+              {form.maps_url && (
+                <button
+                  type="button"
+                  onClick={() => setForm((f) => ({ ...f, maps_url: '' }))}
+                  className="text-[11px] text-muted hover:text-red-400 transition-colors"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+            {(() => {
+              const coords = extractLatLng(form.maps_url);
+              return (
+                <button
+                  type="button"
+                  onClick={() => setPickerOpen(true)}
+                  className={`w-full text-left flex items-center gap-3 rounded-lg border px-3 py-2.5 transition-colors ${
+                    coords
+                      ? 'bg-accent/8 border-accent/40 hover:border-accent/60'
+                      : 'bg-base border-line hover:border-line-2'
+                  }`}
+                >
+                  <span
+                    className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                      coords ? 'text-on-accent' : 'bg-surface-2 text-muted'
+                    }`}
+                    style={coords ? {
+                      background: 'linear-gradient(135deg, rgb(var(--c-accent)), rgb(var(--c-accent-2)))',
+                      boxShadow: '0 4px 12px -2px rgb(var(--c-accent) / 0.45)',
+                    } : {}}
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/>
+                    </svg>
+                  </span>
+                  <span className="flex-1 min-w-0">
+                    {coords ? (
+                      <>
+                        <span className="block text-sm font-semibold text-content">Pin saved</span>
+                        <span className="block text-[11px] text-muted tabular truncate">
+                          {coords.lat.toFixed(5)}, {coords.lng.toFixed(5)}
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        <span className="block text-sm font-medium text-content">Tap to pick on map</span>
+                        <span className="block text-[11px] text-muted truncate">
+                          Search, drop a pin, or use GPS
+                        </span>
+                      </>
+                    )}
+                  </span>
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-subtle flex-shrink-0">
+                    <polyline points="9 18 15 12 9 6"/>
+                  </svg>
+                </button>
+              );
+            })()}
           </div>
 
           {/* ── Days ── */}
@@ -352,9 +506,9 @@ export default function DoctorModal({ doctor, onClose }: DoctorModalProps) {
               <button
                 onClick={handleSave}
                 disabled={updateMutation.isPending}
-                className="flex-1 py-3 bg-accent text-on-accent text-sm font-bold rounded-xl hover:opacity-90 transition-opacity disabled:opacity-50"
+                className="btn-primary flex-1 py-3 text-sm font-bold rounded-xl disabled:opacity-50"
               >
-                {updateMutation.isPending ? 'Saving...' : 'Save Changes'}
+                {updateMutation.isPending ? 'Saving…' : 'Save Changes'}
               </button>
             </div>
           )}
@@ -368,6 +522,24 @@ export default function DoctorModal({ doctor, onClose }: DoctorModalProps) {
           )}
         </div>
       </div>
+
+      {pickerOpen && (
+        <MapPickerModal
+          initialValue={form.maps_url}
+          areaHint={doctor.area}
+          onSave={(value) => { setForm((f) => ({ ...f, maps_url: value })); setPickerOpen(false); }}
+          onClose={() => setPickerOpen(false)}
+        />
+      )}
+
+      {classManagerOpen && (
+        <ClassManagerModal
+          onClose={() => {
+            setClassManagerOpen(false);
+            setClassDefs(getClasses());
+          }}
+        />
+      )}
     </>
   );
 }
