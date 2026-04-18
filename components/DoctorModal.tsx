@@ -22,6 +22,7 @@ export default function DoctorModal({ doctor, onClose }: DoctorModalProps) {
   const queryClient = useQueryClient();
 
   const [form, setForm] = useState({
+    name: '',
     class: '',
     phone: '',
     city: '',
@@ -44,6 +45,7 @@ export default function DoctorModal({ doctor, onClose }: DoctorModalProps) {
   useEffect(() => {
     if (doctor) {
       setForm({
+        name: doctor.name || '',
         class: doctor.class || 'B',
         phone: doctor.phone || '',
         city: doctor.city || '',
@@ -108,6 +110,7 @@ export default function DoctorModal({ doctor, onClose }: DoctorModalProps) {
   const handleSave = () => {
     setSaveError(null);
     updateMutation.mutate({
+      name:     form.name.trim()     || undefined,
       class:    form.class           || undefined,
       phone:    form.phone           || null,
       city:     form.city.trim()     || null,
@@ -256,6 +259,18 @@ export default function DoctorModal({ doctor, onClose }: DoctorModalProps) {
                 + Add specific date
               </button>
             )}
+          </div>
+
+          {/* ── Name ── */}
+          <div>
+            <label className="text-xs text-muted mb-1 block">Name</label>
+            <input
+              type="text"
+              value={form.name}
+              onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+              className={inputClass}
+              placeholder="Doctor name"
+            />
           </div>
 
           {/* ── Class ── */}
