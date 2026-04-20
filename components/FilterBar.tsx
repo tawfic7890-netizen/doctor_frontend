@@ -8,6 +8,7 @@ export interface Filters {
   day: string;
   area: string;
   hideF: boolean;
+  needVisitRanges: string[];
 }
 
 interface FilterBarProps {
@@ -26,12 +27,32 @@ const DAY_TABS = DAYS.map((d) => ({ value: d, label: d }));
 
 export default function FilterBar({ filters, onChange }: FilterBarProps) {
   const [showDays, setShowDays] = useState(false);
+  const [needVisitOpen, setNeedVisitOpen] = useState(false);
 
   const set = (partial: Partial<Filters>) => onChange({ ...filters, ...partial });
 
   function toggleStatus(value: string) {
+    if (value === 'NEED_VISIT') {
+      if (needVisitOpen) {
+        // close: remove NEED_VISIT and clear ranges
+        setNeedVisitOpen(false);
+        set({ statuses: filters.statuses.filter((s) => s !== 'NEED_VISIT'), needVisitRanges: [] });
+      } else {
+        // open: add NEED_VISIT if not already there
+        setNeedVisitOpen(true);
+        if (!filters.statuses.includes('NEED_VISIT')) {
+          set({ statuses: [...filters.statuses, 'NEED_VISIT'] });
+        }
+      }
+      return;
+    }
     const has = filters.statuses.includes(value);
     set({ statuses: has ? filters.statuses.filter((s) => s !== value) : [...filters.statuses, value] });
+  }
+
+  function toggleNeedVisitRange(range: string) {
+    const has = filters.needVisitRanges.includes(range);
+    set({ needVisitRanges: has ? filters.needVisitRanges.filter((r) => r !== range) : [...filters.needVisitRanges, range] });
   }
 
   return (
@@ -66,7 +87,7 @@ export default function FilterBar({ filters, onChange }: FilterBarProps) {
       <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5" style={{ scrollbarWidth: 'none' }}>
         {/* All */}
         <button
-          onClick={() => set({ statuses: [] })}
+          onClick={() => { setNeedVisitOpen(false); set({ statuses: [], needVisitRanges: [] }); }}
           className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-colors border ${
             filters.statuses.length === 0
               ? 'bg-accent text-on-accent border-accent'
@@ -136,6 +157,34 @@ export default function FilterBar({ filters, onChange }: FilterBarProps) {
           ))}
         </select>
       </div>
+
+      {/* Need Visit range sub-row */}
+      {needVisitOpen && (
+        <div className="flex gap-2 overflow-x-auto pb-0.5" style={{ scrollbarWidth: 'none' }}>
+          {([
+            { range: '12_20',   label: '12–20 days' },
+            { range: '20_30',   label: '20–30 days' },
+            { range: '30_PLUS', label: '30+ days' },
+          ] as const).map(({ range, label }) => {
+            const active = filters.needVisitRanges.includes(range);
+            return (
+              <button
+                key={range}
+                onClick={() => toggleNeedVisitRange(range)}
+                className={`flex-shrink-0 text-xs px-3 py-1.5 rounded-full border font-medium transition-colors ${
+                  active ? 'border-transparent text-on-accent' : 'bg-surface text-muted border-line hover:border-line-2'
+                }`}
+                style={active ? {
+                  background: 'linear-gradient(135deg, rgb(var(--c-warning)), rgb(var(--c-warning) / 0.75))',
+                  boxShadow: '0 4px 10px -2px rgb(var(--c-warning) / 0.45)',
+                } : {}}
+              >
+                {label}
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       {/* Active multi-filter chips */}
       {filters.statuses.length > 1 && (

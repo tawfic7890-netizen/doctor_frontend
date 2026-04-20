@@ -5,7 +5,7 @@ import DoctorCard from '@/components/DoctorCard';
 import DoctorModal from '@/components/DoctorModal';
 import FilterBar, { Filters } from '@/components/FilterBar';
 import { api } from '@/lib/api';
-import { Doctor, getDoctorStatus, getCurrentMonthStatus } from '@/lib/utils';
+import { Doctor, getDoctorStatus, getCurrentMonthStatus, getLastVisit } from '@/lib/utils';
 
 export default function DoctorsPage() {
   const [selected, setSelected] = useState<Doctor | null>(null);
@@ -15,6 +15,7 @@ export default function DoctorsPage() {
     day: '',
     area: '',
     hideF: true,
+    needVisitRanges: [],
   });
 
   // Always fetch ALL doctors (including F) — hideF + statuses filtered client-side
@@ -53,8 +54,21 @@ export default function DoctorsPage() {
       );
     }
 
+    // Need Visit range sub-filter
+    if (filters.needVisitRanges.length > 0) {
+      result = result.filter((d) => {
+        const last = getLastVisit(d);
+        const days = last ? (Date.now() - last.getTime()) / 86400000 : null;
+        if (days === null || days <= 12) return false;
+        if (filters.needVisitRanges.includes('12_20') && days > 12 && days <= 20) return true;
+        if (filters.needVisitRanges.includes('20_30') && days > 20 && days <= 30) return true;
+        if (filters.needVisitRanges.includes('30_PLUS') && days > 30) return true;
+        return false;
+      });
+    }
+
     return result;
-  }, [allDoctors, filters.hideF, filters.statuses]);
+  }, [allDoctors, filters.hideF, filters.statuses, filters.needVisitRanges]);
 
   return (
     <div className="min-h-screen bg-base">
