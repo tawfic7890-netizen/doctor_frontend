@@ -143,7 +143,10 @@ export default function DailyPlanPage({ params }: Props) {
 
   const filteredDoctors = useMemo(() => allDoctors.filter((d) => {
     if (d.class?.toLowerCase() === 'f') return false;
-    if (filterByDay && !(Array.isArray(d.days) && d.days.includes(dayAbbrev))) return false;
+    if (filterByDay) {
+      const hasDays = Array.isArray(d.days) && d.days.length > 0;
+      if (hasDays && !d.days.includes(dayAbbrev)) return false;
+    }
 
     if (needVisitOpen) {
       const last = getLastVisit(d);
