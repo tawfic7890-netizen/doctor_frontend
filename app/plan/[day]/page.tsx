@@ -72,6 +72,8 @@ export default function DailyPlanPage({ params }: Props) {
   const [area, setArea] = useState('');
   const [subLocation, setSubLocation] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
+  const [needVisitOpen, setNeedVisitOpen] = useState(false);
+  const [needVisitRanges, setNeedVisitRanges] = useState<Set<string>>(new Set());
   const [filterByDay, setFilterByDay] = useState(true);
 
   const monthName   = getCurrentMonthName();
@@ -94,7 +96,7 @@ export default function DailyPlanPage({ params }: Props) {
   useEffect(() => {
     setEditing(false);
     setSearch(''); setArea(''); setSubLocation('');
-    setStatusFilter(''); setFilterByDay(true);
+    setStatusFilter(''); setNeedVisitOpen(false); setNeedVisitRanges(new Set()); setFilterByDay(true);
   }, [dateStr]);
 
   // ── Mutations ──────────────────────────────────────────────────────────────
@@ -105,7 +107,7 @@ export default function DailyPlanPage({ params }: Props) {
       queryClient.invalidateQueries({ queryKey: ['plan', dateStr] });
       setEditing(false);
       setSearch(''); setArea(''); setSubLocation('');
-      setStatusFilter(''); setFilterByDay(true);
+      setStatusFilter(''); setNeedVisitOpen(false); setNeedVisitRanges(new Set()); setFilterByDay(true);
     },
     onError: (err: Error) => alert(`Failed to save plan: ${err.message}`),
   });
@@ -142,13 +144,26 @@ export default function DailyPlanPage({ params }: Props) {
   const filteredDoctors = useMemo(() => allDoctors.filter((d) => {
     if (d.class?.toLowerCase() === 'f') return false;
     if (filterByDay && !(Array.isArray(d.days) && d.days.includes(dayAbbrev))) return false;
-    if (statusFilter) {
+
+    if (needVisitOpen) {
+      const last = getLastVisit(d);
+      const days = last ? (Date.now() - last.getTime()) / 86400000 : null;
+      if (days === null || days <= 12) return false; // must be NEED_VISIT
+      if (needVisitRanges.size > 0) {
+        let match = false;
+        if (needVisitRanges.has('12_20')   && days > 12 && days <= 20) match = true;
+        if (needVisitRanges.has('20_30')   && days > 20 && days <= 30) match = true;
+        if (needVisitRanges.has('30_PLUS') && days > 30)               match = true;
+        if (!match) return false;
+      }
+    } else if (statusFilter) {
       if (statusFilter === 'CURRENT_MONTH') {
         if (getCurrentMonthStatus(d) === 'none') return false;
       } else {
         if (getDoctorStatus(d) !== statusFilter) return false;
       }
     }
+
     if (area && d.area !== area) return false;
     if (subLocation && d.location?.trim() !== subLocation) return false;
     if (search) {
@@ -158,13 +173,21 @@ export default function DailyPlanPage({ params }: Props) {
              d.area?.toLowerCase().includes(s);
     }
     return true;
-  }), [allDoctors, area, subLocation, search, statusFilter, filterByDay, dayAbbrev]);
+  }), [allDoctors, area, subLocation, search, statusFilter, needVisitOpen, needVisitRanges, filterByDay, dayAbbrev]);
 
   // ── Helpers ────────────────────────────────────────────────────────────────
   function enterEdit() { setEditSelection(new Set(plannedIds)); setEditing(true); }
   function cancelEdit() {
     setEditing(false); setSearch(''); setArea(''); setSubLocation('');
-    setStatusFilter(''); setFilterByDay(true);
+    setStatusFilter(''); setNeedVisitOpen(false); setNeedVisitRanges(new Set()); setFilterByDay(true);
+  }
+
+  function toggleNeedVisitRange(range: string) {
+    setNeedVisitRanges((prev) => {
+      const next = new Set(prev);
+      next.has(range) ? next.delete(range) : next.add(range);
+      return next;
+    });
   }
   function saveEdit() {
     const prev  = plannedIds.filter((id) => editSelection.has(id));
@@ -449,20 +472,35 @@ export default function DailyPlanPage({ params }: Props) {
               </button>
               <span className="flex-shrink-0 w-px bg-line self-stretch mx-0.5" />
               <button
-                onClick={() => setStatusFilter('')}
+                onClick={() => { setStatusFilter(''); setNeedVisitOpen(false); setNeedVisitRanges(new Set()); }}
                 className={`flex-shrink-0 text-xs px-3 py-1.5 rounded-full border font-medium transition-colors ${
-                  statusFilter === '' ? 'bg-accent/15 text-accent border-accent/40' : 'bg-surface text-muted border-line hover:border-line-2'
+                  statusFilter === '' && !needVisitOpen ? 'bg-accent/15 text-accent border-accent/40' : 'bg-surface text-muted border-line hover:border-line-2'
                 }`}
               >All</button>
+              {/* Need Visit — toggles the range sub-row */}
+              <button
+                onClick={() => {
+                  const opening = !needVisitOpen;
+                  setNeedVisitOpen(opening);
+                  setStatusFilter('');
+                  if (!opening) setNeedVisitRanges(new Set());
+                }}
+                className={`flex-shrink-0 text-xs px-3 py-1.5 rounded-full border font-medium transition-colors ${
+                  needVisitOpen
+                    ? 'bg-accent/15 text-accent border-accent/40'
+                    : 'bg-surface text-muted border-line hover:border-line-2'
+                }`}
+              >
+                Need Visit
+              </button>
               {[
-                { value: 'NEED_VISIT',    label: 'Need Visit' },
                 { value: 'NEVER',         label: 'Never' },
                 { value: 'CURRENT_MONTH', label: monthName },
                 { value: 'DEAL',          label: 'Deal' },
               ].map((tab) => (
                 <button
                   key={tab.value}
-                  onClick={() => setStatusFilter(statusFilter === tab.value ? '' : tab.value)}
+                  onClick={() => { setNeedVisitOpen(false); setNeedVisitRanges(new Set()); setStatusFilter(statusFilter === tab.value ? '' : tab.value); }}
                   className={`flex-shrink-0 text-xs px-3 py-1.5 rounded-full border font-medium transition-colors ${
                     statusFilter === tab.value
                       ? 'bg-accent/15 text-accent border-accent/40'
@@ -473,6 +511,36 @@ export default function DailyPlanPage({ params }: Props) {
                 </button>
               ))}
             </div>
+
+            {/* Need Visit range pills (multi-select) — only visible when Need Visit is open */}
+            {needVisitOpen && (
+              <div className="flex gap-2 overflow-x-auto pb-1 pt-1" style={{ scrollbarWidth: 'none' }}>
+                {([
+                  { range: '12_20',   label: '12–20 days' },
+                  { range: '20_30',   label: '20–30 days' },
+                  { range: '30_PLUS', label: '30+ days' },
+                ] as const).map(({ range, label }) => {
+                  const active = needVisitRanges.has(range);
+                  return (
+                    <button
+                      key={range}
+                      onClick={() => toggleNeedVisitRange(range)}
+                      className={`flex-shrink-0 text-xs px-3 py-1.5 rounded-full border font-medium transition-colors ${
+                        active
+                          ? 'border-transparent text-on-accent'
+                          : 'bg-surface text-muted border-line hover:border-line-2'
+                      }`}
+                      style={active ? {
+                        background: 'linear-gradient(135deg, rgb(var(--c-warning)), rgb(var(--c-warning) / 0.75))',
+                        boxShadow: '0 4px 10px -2px rgb(var(--c-warning) / 0.45)',
+                      } : {}}
+                    >
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
 
             {/* Search */}
             <div className="relative my-2">
