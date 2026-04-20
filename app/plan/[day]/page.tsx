@@ -6,10 +6,11 @@ import { api } from '@/lib/api';
 import {
   Doctor, getDoctorStatus, STATUS_COLORS,
   getCurrentMonthStatus, getCurrentMonthName,
-  getLastVisit, AREAS,
+  getLastVisit, daysSince, AREAS,
   todayStr, getWeekDates, dateToDayAbbrev,
   formatFullDate, formatNavDate, shiftWeek,
 } from '@/lib/utils';
+import { getClassDef } from '@/lib/classConfig';
 import DoctorModal from '@/components/DoctorModal';
 import Link from 'next/link';
 
@@ -54,6 +55,26 @@ const IconChevronRight = ({ size = 12 }: { size?: number }) => (
     <polyline points="9 18 15 12 9 6"/>
   </svg>
 );
+
+function getInitials(name: string): string {
+  const parts = name.trim().split(/\s+/);
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+function avatarGradient(name: string, isDeal: boolean): string {
+  if (isDeal) return 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)';
+  const gradients = [
+    'linear-gradient(135deg, #3b82f6 0%, #6366f1 100%)',
+    'linear-gradient(135deg, #0ea5e9 0%, #06b6d4 100%)',
+    'linear-gradient(135deg, #14b8a6 0%, #0891b2 100%)',
+    'linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%)',
+    'linear-gradient(135deg, #06b6d4 0%, #0284c7 100%)',
+    'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
+  ];
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) hash = (hash * 31 + name.charCodeAt(i)) >>> 0;
+  return gradients[hash % gradients.length];
+}
 
 interface Props { params: { day: string } }
 
@@ -330,60 +351,128 @@ export default function DailyPlanPage({ params }: Props) {
           )}
 
           {plannedDoctors.map((doctor, idx) => {
-            const status = getDoctorStatus(doctor);
-            const color  = STATUS_COLORS[status];
+            const status      = getDoctorStatus(doctor);
+            const statusColor = STATUS_COLORS[status];
             const monthStatus = getCurrentMonthStatus(doctor);
             const lastVisit   = getLastVisit(doctor);
             const isPending   = visitMutation.isPending && visitMutation.variables === doctor.id;
-            const isDeal      = doctor.class === 'a';
+            const isDeal      = status === 'DEAL';
+            const classDef    = getClassDef(doctor.class);
+            const classLabel  = isDeal ? 'DEAL' : classDef.label;
+            const classColor  = isDeal ? '#f59e0b' : classDef.color;
+            const initials    = getInitials(doctor.name);
+
+            const badge = monthStatus === 'twice'
+              ? { label: '✓✓', color: 'rgb(var(--c-success))', bg: 'rgb(var(--c-success) / 0.12)', border: 'rgb(var(--c-success) / 0.25)' }
+              : monthStatus === 'once'
+              ? { label: '✓',  color: 'rgb(var(--c-warning))', bg: 'rgb(var(--c-warning) / 0.12)', border: 'rgb(var(--c-warning) / 0.25)' }
+              : { label: '—',  color: 'rgb(var(--c-subtle))',  bg: 'transparent',                  border: 'rgb(var(--c-line))' };
 
             return (
               <div
                 key={doctor.id}
-                className="doctor-card bg-surface border border-line rounded-2xl p-3 flex items-center gap-3"
-                style={isDeal ? { borderColor: 'rgb(var(--c-warning) / 0.30)' } : {}}
+                className="doctor-card relative bg-surface border border-line rounded-2xl p-3.5 cursor-pointer active:scale-[0.99]"
+                onClick={() => setModalDoctor(doctor)}
+                style={isDeal ? {
+                  borderColor: 'rgb(245 158 11 / 0.35)',
+                  boxShadow: '0 0 0 1px rgb(245 158 11 / 0.12), 0 4px 12px -4px rgb(245 158 11 / 0.15)',
+                } : {}}
               >
-                <div
-                  className="w-8 h-8 rounded-xl bg-surface-2 border border-line flex items-center justify-center flex-shrink-0 tabular"
-                >
-                  <span className="text-xs font-bold text-muted">{idx + 1}</span>
-                </div>
-                <div
-                  className="w-2.5 h-2.5 rounded-full flex-shrink-0"
-                  style={{ backgroundColor: color, boxShadow: `0 0 8px ${color}66` }}
-                />
-                <div className="flex-1 min-w-0 cursor-pointer" onClick={() => setModalDoctor(doctor)}>
-                  <div className="flex items-center gap-2">
-                    <p className="text-sm font-semibold text-content truncate">{doctor.name}</p>
-                    {isDeal && (
+                {isDeal && (
+                  <div className="absolute left-0 top-3 bottom-3 w-[3px] rounded-full" style={{ background: 'linear-gradient(180deg, #fbbf24 0%, #d97706 100%)' }} />
+                )}
+
+                <div className="flex items-start gap-3">
+                  {/* Number + avatar */}
+                  <div className="relative flex-shrink-0">
+                    <div
+                      className="w-11 h-11 rounded-xl flex items-center justify-center font-bold text-white text-sm tracking-wide"
+                      style={{
+                        background: avatarGradient(doctor.name, isDeal),
+                        boxShadow: '0 2px 6px -1px rgb(0 0 0 / 0.25)',
+                      }}
+                    >
+                      {initials}
+                    </div>
+                    {/* Order number */}
+                    <div className="absolute -top-1.5 -left-1.5 w-4.5 h-4.5 min-w-[18px] min-h-[18px] rounded-full bg-surface-2 border border-line flex items-center justify-center">
+                      <span className="text-[9px] font-bold text-muted tabular leading-none px-0.5">{idx + 1}</span>
+                    </div>
+                    <div
+                      className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2"
+                      style={{ backgroundColor: statusColor, borderColor: 'rgb(var(--c-surface))' }}
+                    />
+                  </div>
+
+                  {/* Content */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-semibold text-sm text-content leading-tight">{doctor.name}</span>
                       <span
-                        className="text-[10px] font-semibold px-1.5 py-0.5 rounded-md border"
-                        style={{
-                          background: 'rgb(var(--c-warning) / 0.12)',
-                          color: 'rgb(var(--c-warning))',
-                          borderColor: 'rgb(var(--c-warning) / 0.25)',
-                        }}
-                      >Deal</span>
+                        className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-md border"
+                        style={{ color: classColor, background: `${classColor}1a`, borderColor: `${classColor}44` }}
+                      >
+                        {classLabel}
+                      </span>
+                    </div>
+
+                    <p className="text-xs text-muted mt-0.5 truncate">
+                      {doctor.specialty}
+                      {doctor.city && <span className="text-subtle"> · {doctor.city}</span>}
+                      {doctor.location && <span className="text-subtle"> · {doctor.location}</span>}
+                    </p>
+
+                    {(doctor.phone || (doctor.days?.length > 0) || doctor.time || lastVisit) && (
+                      <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-1.5">
+                        {doctor.phone && <span className="text-[11px] text-subtle tabular">{doctor.phone}</span>}
+                        {doctor.days?.length > 0 && (
+                          <>
+                            {doctor.phone && <span className="text-[10px] text-subtle/60">·</span>}
+                            <span className="text-[11px] text-subtle">{doctor.days.join(' · ')}</span>
+                          </>
+                        )}
+                        {doctor.time && (
+                          <><span className="text-[10px] text-subtle/60">·</span><span className="text-[11px] text-subtle">{doctor.time}</span></>
+                        )}
+                        {lastVisit && (
+                          <><span className="text-[10px] text-subtle/60">·</span><span className="text-[11px] text-subtle">{daysSince(lastVisit.toISOString())}</span></>
+                        )}
+                      </div>
+                    )}
+
+                    {doctor.request && (
+                      <span
+                        className="inline-block mt-1.5 text-[10px] rounded-md px-2 py-0.5 max-w-[200px] truncate border"
+                        style={{ color: 'rgb(var(--c-accent))', background: 'rgb(var(--c-accent) / 0.08)', borderColor: 'rgb(var(--c-accent) / 0.20)' }}
+                      >
+                        {doctor.request}
+                      </span>
+                    )}
+
+                    {doctor.note && (
+                      <p className="text-[11px] text-amber-400/70 mt-1.5 leading-snug line-clamp-1">{doctor.note}</p>
                     )}
                   </div>
-                  <p className="text-xs text-muted truncate mt-0.5">
-                    {doctor.specialty} · {doctor.location || doctor.area}
-                    {lastVisit && (
-                      <span className="tabular"> · {Math.floor((Date.now() - lastVisit.getTime()) / 86400000)}d ago</span>
-                    )}
-                  </p>
-                </div>
-                <div className="flex-shrink-0 flex flex-col items-end gap-1">
-                  {monthBadge(monthStatus, false)}
-                  {monthStatus !== 'twice' && (
-                    <button
-                      onClick={() => visitMutation.mutate(doctor.id)}
-                      disabled={isPending}
-                      className="text-[10px] bg-accent/15 text-accent border border-accent/30 px-2.5 py-1 rounded-lg font-semibold hover:bg-accent/25 transition-colors disabled:opacity-50 whitespace-nowrap"
+
+                  {/* Month badge + Visit button */}
+                  <div className="flex-shrink-0 flex flex-col items-center gap-1 ml-1">
+                    <div
+                      className="w-11 h-11 rounded-xl flex items-center justify-center border tabular font-bold text-base"
+                      style={{ color: badge.color, background: badge.bg, borderColor: badge.border }}
                     >
-                      {isPending ? '…' : 'Visit'}
-                    </button>
-                  )}
+                      {badge.label}
+                    </div>
+                    <span className="text-[8px] text-subtle uppercase tracking-widest font-semibold">{getCurrentMonthName()}</span>
+                    {monthStatus !== 'twice' && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); visitMutation.mutate(doctor.id); }}
+                        disabled={isPending}
+                        className="mt-1 text-[10px] bg-accent/15 text-accent border border-accent/30 px-2.5 py-1 rounded-lg font-semibold hover:bg-accent/25 transition-colors disabled:opacity-50 whitespace-nowrap"
+                      >
+                        {isPending ? '…' : 'Visit'}
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
             );
@@ -615,53 +704,121 @@ export default function DailyPlanPage({ params }: Props) {
         )}
         {filteredDoctors.map((doctor) => {
           const isSelected  = editSelection.has(doctor.id);
-          const statusColor = STATUS_COLORS[getDoctorStatus(doctor)];
-          const location    = doctor.location?.trim() || doctor.area;
+          const status      = getDoctorStatus(doctor);
+          const statusColor = STATUS_COLORS[status];
           const monthStatus = getCurrentMonthStatus(doctor);
+          const lastVisit   = getLastVisit(doctor);
+          const isDeal      = status === 'DEAL';
+          const classDef    = getClassDef(doctor.class);
+          const classLabel  = isDeal ? 'DEAL' : classDef.label;
+          const classColor  = isDeal ? '#f59e0b' : classDef.color;
+          const initials    = getInitials(doctor.name);
+
+          const badge = monthStatus === 'twice'
+            ? { label: '✓✓', color: 'rgb(var(--c-success))', bg: 'rgb(var(--c-success) / 0.12)', border: 'rgb(var(--c-success) / 0.25)' }
+            : monthStatus === 'once'
+            ? { label: '✓',  color: 'rgb(var(--c-warning))', bg: 'rgb(var(--c-warning) / 0.12)', border: 'rgb(var(--c-warning) / 0.25)' }
+            : { label: '—',  color: 'rgb(var(--c-subtle))',  bg: 'transparent',                  border: 'rgb(var(--c-line))' };
 
           return (
             <div
               key={doctor.id}
               onClick={() => toggleDoctor(doctor.id)}
-              className={`doctor-card rounded-2xl border p-3 cursor-pointer ${
+              className={`doctor-card relative rounded-2xl border p-3.5 cursor-pointer active:scale-[0.99] transition-all ${
                 isSelected ? 'bg-accent/8 border-accent/50' : 'bg-surface border-line hover:border-line-2'
               }`}
-              style={isSelected ? { boxShadow: 'var(--shadow-md)' } : {}}
+              style={{
+                ...(isDeal && !isSelected ? {
+                  borderColor: 'rgb(245 158 11 / 0.35)',
+                  boxShadow: '0 0 0 1px rgb(245 158 11 / 0.12), 0 4px 12px -4px rgb(245 158 11 / 0.15)',
+                } : {}),
+                ...(isSelected ? { boxShadow: 'var(--shadow-md)' } : {}),
+              }}
             >
-              <div className="flex items-center gap-3">
-                <div
-                  className={`w-7 h-7 rounded-full flex-shrink-0 flex items-center justify-center border-2 transition-all ${
-                    isSelected ? 'border-accent text-on-accent' : 'border-line-2 text-transparent'
-                  }`}
-                  style={isSelected ? {
-                    background: 'linear-gradient(180deg, rgb(var(--c-accent)), rgb(var(--c-accent) / 0.85))',
-                    boxShadow: '0 4px 12px -2px rgb(var(--c-accent) / 0.45)',
-                  } : {}}
-                >
-                  {isSelected && <IconCheck size={13} />}
+              {isDeal && !isSelected && (
+                <div className="absolute left-0 top-3 bottom-3 w-[3px] rounded-full" style={{ background: 'linear-gradient(180deg, #fbbf24 0%, #d97706 100%)' }} />
+              )}
+
+              <div className="flex items-start gap-3">
+                {/* Checkbox / avatar */}
+                <div className="relative flex-shrink-0">
+                  <div
+                    className="w-11 h-11 rounded-xl flex items-center justify-center font-bold text-white text-sm tracking-wide"
+                    style={{
+                      background: isSelected
+                        ? 'linear-gradient(135deg, rgb(var(--c-accent)), rgb(var(--c-accent) / 0.85))'
+                        : avatarGradient(doctor.name, isDeal),
+                      boxShadow: '0 2px 6px -1px rgb(0 0 0 / 0.25)',
+                    }}
+                  >
+                    {isSelected ? <IconCheck size={18} /> : initials}
+                  </div>
+                  <div
+                    className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2"
+                    style={{ backgroundColor: statusColor, borderColor: 'rgb(var(--c-surface))' }}
+                  />
                 </div>
-                <div
-                  className="w-2.5 h-2.5 rounded-full flex-shrink-0"
-                  style={{ backgroundColor: statusColor, boxShadow: `0 0 8px ${statusColor}66` }}
-                />
+
+                {/* Content */}
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-semibold text-content truncate">{doctor.name}</span>
-                    {doctor.class && (
-                      <span className="text-[9px] font-bold text-subtle uppercase tracking-wider border border-line rounded px-1 py-0.5 flex-shrink-0">
-                        {doctor.class}
-                      </span>
-                    )}
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-semibold text-sm text-content leading-tight">{doctor.name}</span>
+                    <span
+                      className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-md border"
+                      style={{ color: classColor, background: `${classColor}1a`, borderColor: `${classColor}44` }}
+                    >
+                      {classLabel}
+                    </span>
                   </div>
-                  <div className="text-xs text-muted mt-0.5 flex items-center gap-1.5">
-                    <span className="text-subtle flex-shrink-0"><IconPin /></span>
-                    <span className="truncate">{location}</span>
-                    {doctor.area && location !== doctor.area && (
-                      <span className="text-subtle flex-shrink-0">· {doctor.area}</span>
-                    )}
-                  </div>
+
+                  <p className="text-xs text-muted mt-0.5 truncate">
+                    {doctor.specialty}
+                    {doctor.city && <span className="text-subtle"> · {doctor.city}</span>}
+                    {doctor.location && <span className="text-subtle"> · {doctor.location}</span>}
+                  </p>
+
+                  {(doctor.phone || (doctor.days?.length > 0) || doctor.time || lastVisit) && (
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-1.5">
+                      {doctor.phone && <span className="text-[11px] text-subtle tabular">{doctor.phone}</span>}
+                      {doctor.days?.length > 0 && (
+                        <>
+                          {doctor.phone && <span className="text-[10px] text-subtle/60">·</span>}
+                          <span className="text-[11px] text-subtle">{doctor.days.join(' · ')}</span>
+                        </>
+                      )}
+                      {doctor.time && (
+                        <><span className="text-[10px] text-subtle/60">·</span><span className="text-[11px] text-subtle">{doctor.time}</span></>
+                      )}
+                      {lastVisit && (
+                        <><span className="text-[10px] text-subtle/60">·</span><span className="text-[11px] text-subtle">{daysSince(lastVisit.toISOString())}</span></>
+                      )}
+                    </div>
+                  )}
+
+                  {doctor.request && (
+                    <span
+                      className="inline-block mt-1.5 text-[10px] rounded-md px-2 py-0.5 max-w-[200px] truncate border"
+                      style={{ color: 'rgb(var(--c-accent))', background: 'rgb(var(--c-accent) / 0.08)', borderColor: 'rgb(var(--c-accent) / 0.20)' }}
+                    >
+                      {doctor.request}
+                    </span>
+                  )}
+
+                  {doctor.note && (
+                    <p className="text-[11px] text-amber-400/70 mt-1.5 leading-snug line-clamp-1">{doctor.note}</p>
+                  )}
                 </div>
-                {monthBadge(monthStatus, true)}
+
+                {/* Month badge */}
+                <div className="flex-shrink-0 flex flex-col items-center gap-0.5 ml-1">
+                  <div
+                    className="w-11 h-11 rounded-xl flex items-center justify-center border tabular font-bold text-base"
+                    style={{ color: badge.color, background: badge.bg, borderColor: badge.border }}
+                  >
+                    {badge.label}
+                  </div>
+                  <span className="text-[8px] text-subtle uppercase tracking-widest font-semibold">{getCurrentMonthName()}</span>
+                </div>
               </div>
             </div>
           );
