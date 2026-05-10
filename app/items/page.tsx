@@ -119,9 +119,10 @@ export default function ItemsPage() {
             onChange={(e) => setForm({ ...form, name: e.target.value })}
             required
           />
-          <input
-            className="w-full px-3 py-2 rounded-xl bg-surface-2 border border-line text-content text-sm"
+          <textarea
+            className="w-full px-3 py-2 rounded-xl bg-surface-2 border border-line text-content text-sm resize-none"
             placeholder="Description"
+            rows={4}
             value={form.description}
             onChange={(e) => setForm({ ...form, description: e.target.value })}
           />

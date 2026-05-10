@@ -420,6 +420,7 @@ export default function DailyPlanPage({ params }: Props) {
 
                     <p className="text-xs text-muted mt-0.5 truncate">
                       {doctor.specialty}
+                      {doctor.area && <span className="text-subtle"> · {doctor.area}</span>}
                       {doctor.city && <span className="text-subtle"> · {doctor.city}</span>}
                       {doctor.location && <span className="text-subtle"> · {doctor.location}</span>}
                     </p>

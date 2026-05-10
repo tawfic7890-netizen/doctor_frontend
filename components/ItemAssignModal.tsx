@@ -63,7 +63,7 @@ export default function ItemAssignModal({ doctorId, doctorName, planDate, onClos
     <div className="fixed inset-0 z-[60] flex items-end justify-center" onClick={onClose}>
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
       <div
-        className="relative w-full max-w-lg bg-surface border-t border-line rounded-t-2xl p-5 pb-8 max-h-[70vh] overflow-y-auto animate-slide-up"
+        className="relative w-full max-w-lg bg-surface border-t border-line rounded-t-2xl p-5 pb-8 max-h-[70vh] overflow-y-auto animate-fade-up"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between mb-4">

@@ -180,7 +180,7 @@ export default function BudgetPage() {
           >
             <option value="">Select doctor...</option>
             {doctors
-              .filter((d) => d.class?.toLowerCase() !== 'f')
+              .filter((d) => d.class === 'a')
               .sort((a, b) => a.name.localeCompare(b.name))
               .map((d) => (
                 <option key={d.id} value={d.id}>{d.name} — {d.area}</option>
