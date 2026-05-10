@@ -20,8 +20,14 @@ export default function LoginPage() {
       const res = await authApi.login(email.trim(), password);
       setToken(res.access_token);
       router.replace('/');
-    } catch {
-      setError('Invalid email or password.');
+    } catch (err: any) {
+      if (err?.message?.includes('Failed to fetch') || err?.message?.includes('NetworkError') || err?.message?.includes('Load failed')) {
+        setError('Cannot reach the server. Please check your connection or try again later.');
+      } else if (err?.message?.includes('401') || err?.message?.includes('403')) {
+        setError('Invalid email or password.');
+      } else {
+        setError(err?.message || 'Something went wrong. Please try again.');
+      }
     } finally {
       setLoading(false);
     }
