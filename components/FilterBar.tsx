@@ -1,19 +1,22 @@
 'use client';
-import { useState } from 'react';
-import { AREAS, DAYS, getCurrentMonthName } from '@/lib/utils';
+import { useState, useMemo } from 'react';
+import { AREAS, CITIES, DAYS, Doctor, getCurrentMonthName } from '@/lib/utils';
 
 export interface Filters {
   search: string;
   statuses: string[];
   day: string;
   area: string;
+  town: string;
   hideF: boolean;
+  hideNever: boolean;
   needVisitRanges: string[];
 }
 
 interface FilterBarProps {
   filters: Filters;
   onChange: (f: Filters) => void;
+  doctors?: Doctor[];
 }
 
 const STATUS_TABS = [
@@ -25,7 +28,7 @@ const STATUS_TABS = [
 
 const DAY_TABS = DAYS.map((d) => ({ value: d, label: d }));
 
-export default function FilterBar({ filters, onChange }: FilterBarProps) {
+export default function FilterBar({ filters, onChange, doctors = [] }: FilterBarProps) {
   const [showDays, setShowDays] = useState(false);
   const [needVisitOpen, setNeedVisitOpen] = useState(false);
 
@@ -145,10 +148,22 @@ export default function FilterBar({ filters, onChange }: FilterBarProps) {
           {filters.hideF ? 'Show F' : 'Hide F'}
         </button>
 
+        {/* Hide/show Never */}
+        <button
+          onClick={() => set({ hideNever: !filters.hideNever })}
+          className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-colors border ${
+            !filters.hideNever
+              ? 'bg-surface-2 text-content border-subtle'
+              : 'bg-surface text-muted hover:text-content border-line'
+          }`}
+        >
+          {filters.hideNever ? 'Show Never' : 'Hide Never'}
+        </button>
+
         {/* Area select */}
         <select
           value={filters.area}
-          onChange={(e) => set({ area: e.target.value })}
+          onChange={(e) => set({ area: e.target.value, town: '' })}
           className="flex-shrink-0 bg-surface border border-line text-xs text-content rounded-full px-3 py-1.5 focus:outline-none focus:border-accent min-w-[95px] cursor-pointer"
         >
           <option value="">All Areas</option>
@@ -185,6 +200,40 @@ export default function FilterBar({ filters, onChange }: FilterBarProps) {
           })}
         </div>
       )}
+
+      {/* Town pills — appear when an area is selected */}
+      {filters.area && (() => {
+        const knownTowns = CITIES[filters.area] ?? [];
+        // Also include towns from actual doctor data that may not be in CITIES
+        const doctorTowns = doctors
+          .filter((d) => d.area === filters.area && d.city?.trim())
+          .map((d) => d.city!.trim());
+        const allTowns = Array.from(new Set([...knownTowns, ...doctorTowns])).sort();
+        if (allTowns.length === 0) return null;
+        return (
+          <div className="flex gap-1.5 overflow-x-auto pb-0.5" style={{ scrollbarWidth: 'none' }}>
+            <button
+              onClick={() => set({ town: '' })}
+              className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors ${
+                !filters.town ? 'bg-accent text-on-accent border-accent' : 'bg-surface text-muted border-line hover:text-content'
+              }`}
+            >
+              All {filters.area}
+            </button>
+            {allTowns.map((t) => (
+              <button
+                key={t}
+                onClick={() => set({ town: filters.town === t ? '' : t })}
+                className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors ${
+                  filters.town === t ? 'bg-accent text-on-accent border-accent' : 'bg-surface text-muted border-line hover:text-content'
+                }`}
+              >
+                {t}
+              </button>
+            ))}
+          </div>
+        );
+      })()}
 
       {/* Active multi-filter chips */}
       {filters.statuses.length > 1 && (

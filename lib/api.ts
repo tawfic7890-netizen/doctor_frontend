@@ -153,6 +153,7 @@ export const api = {
         visitedTwice: number;
         neverVisited: number;
         needVisit: number;
+        notVisitedThisMonth: number;
         byArea: Array<{ area: string; total: number; visited: number }>;
       }>('/stats'),
   },

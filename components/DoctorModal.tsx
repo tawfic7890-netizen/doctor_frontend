@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
-  Doctor, Visit, AREAS, CITIES, DAYS,
+  Doctor, Visit, CITIES, DAYS,
   formatDate, getDoctorStatus, STATUS_COLORS,
   getAllVisitsSorted, extractLatLng,
 } from '@/lib/utils';
@@ -311,9 +311,9 @@ export default function DoctorModal({ doctor, onClose }: DoctorModalProps) {
             </div>
           </div>
 
-          {/* ── City ── */}
+          {/* ── Town ── */}
           <div>
-            <label className="text-xs text-muted mb-1.5 block">City / Town</label>
+            <label className="text-xs text-muted mb-1.5 block">Town</label>
             {(CITIES[doctor.area]?.length ?? 0) > 0 && (
               <div className="flex flex-wrap gap-1.5 mb-2">
                 {CITIES[doctor.area].map((c) => (
@@ -354,7 +354,7 @@ export default function DoctorModal({ doctor, onClose }: DoctorModalProps) {
                   return { ...f, city: newCity, location: newLocation };
                 });
               }}
-              placeholder="Or type a city…"
+              placeholder="Or type a town…"
               className={inputClass}
             />
           </div>

@@ -273,7 +273,7 @@ export default function AddDoctorPage() {
           {/* City */}
           {form.area && (
             <div>
-              <label className="text-xs font-semibold text-muted block mb-1.5">City / Town</label>
+              <label className="text-xs font-semibold text-muted block mb-1.5">Town</label>
               {/* Known cities as pills */}
               {(CITIES[form.area]?.length ?? 0) > 0 && (
                 <div className="flex flex-wrap gap-1.5 mb-2">
@@ -314,7 +314,7 @@ export default function AddDoctorPage() {
                     set('location', newCity ? `${form.area}, ${newCity}` : '');
                   }
                 }}
-                placeholder="Or type a city…"
+                placeholder="Or type a town…"
                 className={inputClass}
               />
             </div>

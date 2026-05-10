@@ -14,7 +14,9 @@ export default function DoctorsPage() {
     statuses: [],
     day: '',
     area: '',
+    town: '',
     hideF: true,
+    hideNever: true,
     needVisitRanges: [],
   });
 
@@ -44,6 +46,11 @@ export default function DoctorsPage() {
       result = result.filter((d) => d.class?.toLowerCase() !== 'f');
     }
 
+    // Hide NEVER-visited doctors when hideNever is on
+    if (filters.hideNever) {
+      result = result.filter((d) => getDoctorStatus(d) !== 'NEVER');
+    }
+
     // Multi-status filter (OR logic)
     if (filters.statuses.length > 0) {
       result = result.filter((d) =>
@@ -67,8 +74,13 @@ export default function DoctorsPage() {
       });
     }
 
+    // Town sub-filter
+    if (filters.town) {
+      result = result.filter((d) => d.city?.trim() === filters.town);
+    }
+
     return result;
-  }, [allDoctors, filters.hideF, filters.statuses, filters.needVisitRanges]);
+  }, [allDoctors, filters.hideF, filters.hideNever, filters.statuses, filters.needVisitRanges, filters.town]);
 
   return (
     <div className="min-h-screen bg-base">
@@ -88,7 +100,7 @@ export default function DoctorsPage() {
         </div>
       </div>
 
-      <FilterBar filters={filters} onChange={setFilters} />
+      <FilterBar filters={filters} onChange={setFilters} doctors={allDoctors} />
 
       <div className="px-3 py-3 space-y-2">
         {isLoading && (
