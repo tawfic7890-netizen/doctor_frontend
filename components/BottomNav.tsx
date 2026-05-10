@@ -20,10 +20,10 @@ function DoctorsIcon({ active }: { active: boolean }) {
   );
 }
 
-function TripIcon({ active }: { active: boolean }) {
+function ItemsIcon({ active }: { active: boolean }) {
   return (
     <svg width="22" height="22" viewBox="0 0 24 24" fill={active ? 'currentColor' : 'none'} fillOpacity={active ? 0.18 : 0} stroke="currentColor" strokeWidth={active ? 2 : 1.7} strokeLinecap="round" strokeLinejoin="round">
-      <path d="M3 11l19-9-9 19-2-8-8-2z"/>
+      <path d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
     </svg>
   );
 }
@@ -52,7 +52,7 @@ function AddIcon({ active }: { active: boolean }) {
 const navItems = [
   { href: '/',           label: 'Home',    Icon: HomeIcon },
   { href: '/doctors',    label: 'Doctors', Icon: DoctorsIcon },
-  { href: '/trip',       label: 'Trip',    Icon: TripIcon },
+  { href: '/items',      label: 'Items',   Icon: ItemsIcon },
   { href: '/plan/today', label: 'Daily',   Icon: DailyIcon },
   { href: '/add',        label: 'Add',     Icon: AddIcon },
 ];

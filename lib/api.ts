@@ -1,4 +1,4 @@
-import { Doctor, Visit } from './utils';
+import { Doctor, Visit, Item, ItemAssignment, MonthlyBudget, DoctorDeal } from './utils';
 import { getToken, clearToken } from './auth';
 
 const BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
@@ -156,5 +156,47 @@ export const api = {
         notVisitedThisMonth: number;
         byArea: Array<{ area: string; total: number; visited: number }>;
       }>('/stats'),
+  },
+
+  items: {
+    list: () => req<Item[]>('/items'),
+    get: (id: number) => req<Item>(`/items/${id}`),
+    create: (body: Partial<Item>) =>
+      req<Item>('/items', { method: 'POST', body: JSON.stringify(body) }),
+    update: (id: number, body: Partial<Item>) =>
+      req<Item>(`/items/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+    delete: (id: number) =>
+      req<void>(`/items/${id}`, { method: 'DELETE' }),
+
+    // Assignments
+    assignments: (params?: { plan_date?: string; doctor_id?: number; item_id?: number }) => {
+      const sp = new URLSearchParams();
+      if (params?.plan_date) sp.set('plan_date', params.plan_date);
+      if (params?.doctor_id) sp.set('doctor_id', String(params.doctor_id));
+      if (params?.item_id) sp.set('item_id', String(params.item_id));
+      const q = sp.toString();
+      return req<ItemAssignment[]>(`/items/assignments/list${q ? `?${q}` : ''}`);
+    },
+    assign: (body: { item_id: number; doctor_id: number; plan_date: string }) =>
+      req<ItemAssignment>('/items/assignments', { method: 'POST', body: JSON.stringify(body) }),
+    updateAssignment: (id: number, status: 'pending' | 'done') =>
+      req<ItemAssignment>(`/items/assignments/${id}`, { method: 'PATCH', body: JSON.stringify({ status }) }),
+    removeAssignment: (id: number) =>
+      req<void>(`/items/assignments/${id}`, { method: 'DELETE' }),
+  },
+
+  budgets: {
+    get: (month: string) =>
+      req<MonthlyBudget | null>(`/budgets?month=${month}`),
+    set: (month: string, budget: number) =>
+      req<MonthlyBudget>('/budgets', { method: 'POST', body: JSON.stringify({ month, budget }) }),
+    summary: (month: string) =>
+      req<{ budget: number; spent: number; remaining: number }>(`/budgets/summary?month=${month}`),
+    deals: (month: string) =>
+      req<DoctorDeal[]>(`/budgets/deals?month=${month}`),
+    createDeal: (body: { doctor_id: number; month: string; amount: number; note?: string }) =>
+      req<DoctorDeal>('/budgets/deals', { method: 'POST', body: JSON.stringify(body) }),
+    removeDeal: (id: number) =>
+      req<void>(`/budgets/deals/${id}`, { method: 'DELETE' }),
   },
 };

@@ -294,6 +294,42 @@ export function shiftWeek(dateStr: string, delta: number): string {
   d.setUTCDate(d.getUTCDate() + delta * 7);
   return d.toISOString().split('T')[0];
 }
+// ─── Items & Budgets types ───────────────────────────────────────────────────
+
+export interface Item {
+  id: number;
+  name: string;
+  description?: string;
+  price?: number;
+  ingredients?: string;
+  created_at: string;
+}
+
+export interface ItemAssignment {
+  id: number;
+  item_id: number;
+  doctor_id: number;
+  plan_date: string;
+  status: 'pending' | 'done';
+  created_at: string;
+}
+
+export interface MonthlyBudget {
+  id: number;
+  month: string;
+  budget: number;
+  created_at: string;
+}
+
+export interface DoctorDeal {
+  id: number;
+  doctor_id: number;
+  month: string;
+  amount: number;
+  note?: string;
+  created_at: string;
+}
+
 export const SPECIALTIES = [
   'General Practitioner',
   'Internal Medicine',

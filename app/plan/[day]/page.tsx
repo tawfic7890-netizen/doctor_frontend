@@ -12,6 +12,7 @@ import {
 } from '@/lib/utils';
 import { getClassDef } from '@/lib/classConfig';
 import DoctorModal from '@/components/DoctorModal';
+import ItemAssignModal from '@/components/ItemAssignModal';
 import Link from 'next/link';
 
 /* ── Icons ────────────────────────────────────────────────────────────── */
@@ -86,6 +87,7 @@ export default function DailyPlanPage({ params }: Props) {
   const dateStr = params.day === 'today' ? todayStr() : params.day;
 
   const [modalDoctor, setModalDoctor] = useState<Doctor | null>(null);
+  const [itemAssignDoctor, setItemAssignDoctor] = useState<Doctor | null>(null);
   const [editing, setEditing] = useState(false);
   const [plannedIds, setPlannedIds] = useState<number[]>([]);
   const [editSelection, setEditSelection] = useState<Set<number>>(new Set());
@@ -472,6 +474,12 @@ export default function DailyPlanPage({ params }: Props) {
                         {isPending ? '…' : 'Visit'}
                       </button>
                     )}
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setItemAssignDoctor(doctor); }}
+                      className="mt-1 text-[10px] bg-amber-500/12 text-amber-400 border border-amber-500/25 px-2.5 py-1 rounded-lg font-semibold hover:bg-amber-500/20 transition-colors whitespace-nowrap"
+                    >
+                      Items
+                    </button>
                   </div>
                 </div>
               </div>
@@ -501,6 +509,14 @@ export default function DailyPlanPage({ params }: Props) {
         </div>
 
         {modalDoctor && <DoctorModal doctor={modalDoctor} onClose={() => setModalDoctor(null)} />}
+        {itemAssignDoctor && (
+          <ItemAssignModal
+            doctorId={itemAssignDoctor.id}
+            doctorName={itemAssignDoctor.name}
+            planDate={dateStr}
+            onClose={() => setItemAssignDoctor(null)}
+          />
+        )}
       </div>
     );
   }
