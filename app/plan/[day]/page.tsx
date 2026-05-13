@@ -9,6 +9,7 @@ import {
   getLastVisit, daysSince, AREAS,
   todayStr, getWeekDates, dateToDayAbbrev,
   formatFullDate, formatNavDate, shiftWeek,
+  Item, ItemAssignment,
 } from '@/lib/utils';
 import { getClassDef } from '@/lib/classConfig';
 import DoctorModal from '@/components/DoctorModal';
@@ -187,6 +188,42 @@ export default function DailyPlanPage({ params }: Props) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['doctors'] });
       queryClient.invalidateQueries({ queryKey: ['stats'] });
+    },
+  });
+
+  // ── Items & assignments for this date ────────────────────────────────────
+  const { data: allItems = [] } = useQuery({
+    queryKey: ['items'],
+    queryFn: () => api.items.list(),
+  });
+
+  const { data: dayAssignments = [] } = useQuery({
+    queryKey: ['item-assignments', dateStr],
+    queryFn: () => api.items.assignments({ plan_date: dateStr }),
+  });
+
+  const itemMap = useMemo(() => {
+    const m = new Map<number, Item>();
+    allItems.forEach((i) => m.set(i.id, i));
+    return m;
+  }, [allItems]);
+
+  // Group assignments by doctor_id
+  const assignmentsByDoctor = useMemo(() => {
+    const m = new Map<number, ItemAssignment[]>();
+    dayAssignments.forEach((a: ItemAssignment) => {
+      const arr = m.get(a.doctor_id) || [];
+      arr.push(a);
+      m.set(a.doctor_id, arr);
+    });
+    return m;
+  }, [dayAssignments]);
+
+  const toggleAssignmentMut = useMutation({
+    mutationFn: ({ id, status }: { id: number; status: 'pending' | 'done' }) =>
+      api.items.updateAssignment(id, status),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['item-assignments', dateStr] });
     },
   });
 
@@ -517,6 +554,52 @@ export default function DailyPlanPage({ params }: Props) {
                           {doctor.note && (
                             <p className="text-[11px] text-amber-400/70 mt-1.5 leading-snug line-clamp-1">{doctor.note}</p>
                           )}
+
+                          {/* Assigned items pills */}
+                          {(() => {
+                            const docAssignments = assignmentsByDoctor.get(doctor.id);
+                            if (!docAssignments || docAssignments.length === 0) return null;
+                            return (
+                              <div className="flex flex-wrap gap-1.5 mt-2">
+                                {docAssignments.map((a) => {
+                                  const item = itemMap.get(a.item_id);
+                                  const isDone = a.status === 'done';
+                                  return (
+                                    <button
+                                      key={a.id}
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        toggleAssignmentMut.mutate({
+                                          id: a.id,
+                                          status: isDone ? 'pending' : 'done',
+                                        });
+                                      }}
+                                      className={`flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-md border transition-colors ${
+                                        isDone
+                                          ? 'bg-green-500/12 text-green-400 border-green-500/30'
+                                          : 'bg-red-500/12 text-red-400 border-red-500/30'
+                                      }`}
+                                    >
+                                      <span
+                                        className={`w-2.5 h-2.5 rounded-full flex-shrink-0 border ${
+                                          isDone
+                                            ? 'bg-green-500 border-green-500'
+                                            : 'border-red-400 bg-transparent'
+                                        }`}
+                                      >
+                                        {isDone && (
+                                          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round">
+                                            <polyline points="20 6 9 17 4 12"/>
+                                          </svg>
+                                        )}
+                                      </span>
+                                      {item?.name ?? `Item #${a.item_id}`}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            );
+                          })()}
                         </div>
 
                         {/* Month badge + Visit button */}
