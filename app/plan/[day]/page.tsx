@@ -14,6 +14,12 @@ import { getClassDef } from '@/lib/classConfig';
 import DoctorModal from '@/components/DoctorModal';
 import ItemAssignModal from '@/components/ItemAssignModal';
 import Link from 'next/link';
+import {
+  DndContext, closestCenter, DragEndEvent,
+  PointerSensor, TouchSensor, useSensor, useSensors,
+} from '@dnd-kit/core';
+import { SortableContext, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 
 /* ── Icons ────────────────────────────────────────────────────────────── */
 const IconCalendar = ({ size = 16 }: { size?: number }) => (
@@ -57,6 +63,14 @@ const IconChevronRight = ({ size = 12 }: { size?: number }) => (
   </svg>
 );
 
+const IconGrip = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+    <circle cx="9" cy="5" r="1.5"/><circle cx="15" cy="5" r="1.5"/>
+    <circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/>
+    <circle cx="9" cy="19" r="1.5"/><circle cx="15" cy="19" r="1.5"/>
+  </svg>
+);
+
 function getInitials(name: string): string {
   const parts = name.trim().split(/\s+/);
   if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
@@ -75,6 +89,34 @@ function avatarGradient(name: string, isDeal: boolean): string {
   let hash = 0;
   for (let i = 0; i < name.length; i++) hash = (hash * 31 + name.charCodeAt(i)) >>> 0;
   return gradients[hash % gradients.length];
+}
+
+function SortableDoctorWrapper({ id, children }: { id: number; children: React.ReactNode }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
+  return (
+    <div
+      ref={setNodeRef}
+      style={{
+        transform: CSS.Transform.toString(transform),
+        transition,
+        opacity: isDragging ? 0.5 : 1,
+        zIndex: isDragging ? 50 : 'auto',
+        position: 'relative',
+      }}
+    >
+      <div className="flex items-stretch">
+        <button
+          {...attributes}
+          {...listeners}
+          className="flex items-center px-1.5 text-subtle hover:text-muted touch-none cursor-grab active:cursor-grabbing"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <IconGrip />
+        </button>
+        <div className="flex-1 min-w-0">{children}</div>
+      </div>
+    </div>
+  );
 }
 
 interface Props { params: { day: string } }
@@ -147,6 +189,24 @@ export default function DailyPlanPage({ params }: Props) {
       queryClient.invalidateQueries({ queryKey: ['stats'] });
     },
   });
+
+  // ── Drag-and-drop sensors ─────────────────────────────────────────────────
+  const pointerSensor = useSensor(PointerSensor, { activationConstraint: { distance: 8 } });
+  const touchSensor = useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 5 } });
+  const sensors = useSensors(pointerSensor, touchSensor);
+
+  function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const oldIdx = plannedIds.indexOf(Number(active.id));
+    const newIdx = plannedIds.indexOf(Number(over.id));
+    if (oldIdx === -1 || newIdx === -1) return;
+    const newIds = [...plannedIds];
+    newIds.splice(oldIdx, 1);
+    newIds.splice(newIdx, 0, Number(active.id));
+    setPlannedIds(newIds);
+    savePlanMutation.mutate(newIds);
+  }
 
   const isLoading = planLoading || doctorsLoading;
 
@@ -352,140 +412,145 @@ export default function DailyPlanPage({ params }: Props) {
             </div>
           )}
 
-          {plannedDoctors.map((doctor, idx) => {
-            const status      = getDoctorStatus(doctor);
-            const statusColor = STATUS_COLORS[status];
-            const monthStatus = getCurrentMonthStatus(doctor);
-            const lastVisit   = getLastVisit(doctor);
-            const isPending   = visitMutation.isPending && visitMutation.variables === doctor.id;
-            const isDeal      = status === 'DEAL';
-            const classDef    = getClassDef(doctor.class);
-            const classLabel  = isDeal ? 'DEAL' : classDef.label;
-            const classColor  = isDeal ? '#f59e0b' : classDef.color;
-            const initials    = getInitials(doctor.name);
+          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+            <SortableContext items={plannedIds} strategy={verticalListSortingStrategy}>
+              {plannedDoctors.map((doctor, idx) => {
+                const status      = getDoctorStatus(doctor);
+                const statusColor = STATUS_COLORS[status];
+                const monthStatus = getCurrentMonthStatus(doctor);
+                const lastVisit   = getLastVisit(doctor);
+                const isPending   = visitMutation.isPending && visitMutation.variables === doctor.id;
+                const isDeal      = status === 'DEAL';
+                const classDef    = getClassDef(doctor.class);
+                const classLabel  = isDeal ? 'DEAL' : classDef.label;
+                const classColor  = isDeal ? '#f59e0b' : classDef.color;
+                const initials    = getInitials(doctor.name);
 
-            const badge = monthStatus === 'twice'
-              ? { label: '✓✓', color: 'rgb(var(--c-success))', bg: 'rgb(var(--c-success) / 0.12)', border: 'rgb(var(--c-success) / 0.25)' }
-              : monthStatus === 'once'
-              ? { label: '✓',  color: 'rgb(var(--c-warning))', bg: 'rgb(var(--c-warning) / 0.12)', border: 'rgb(var(--c-warning) / 0.25)' }
-              : { label: '—',  color: 'rgb(var(--c-subtle))',  bg: 'transparent',                  border: 'rgb(var(--c-line))' };
+                const badge = monthStatus === 'twice'
+                  ? { label: '✓✓', color: 'rgb(var(--c-success))', bg: 'rgb(var(--c-success) / 0.12)', border: 'rgb(var(--c-success) / 0.25)' }
+                  : monthStatus === 'once'
+                  ? { label: '✓',  color: 'rgb(var(--c-warning))', bg: 'rgb(var(--c-warning) / 0.12)', border: 'rgb(var(--c-warning) / 0.25)' }
+                  : { label: '—',  color: 'rgb(var(--c-subtle))',  bg: 'transparent',                  border: 'rgb(var(--c-line))' };
 
-            return (
-              <div
-                key={doctor.id}
-                className="doctor-card relative bg-surface border border-line rounded-2xl p-3.5 cursor-pointer active:scale-[0.99]"
-                onClick={() => setModalDoctor(doctor)}
-                style={isDeal ? {
-                  borderColor: 'rgb(245 158 11 / 0.35)',
-                  boxShadow: '0 0 0 1px rgb(245 158 11 / 0.12), 0 4px 12px -4px rgb(245 158 11 / 0.15)',
-                } : {}}
-              >
-                {isDeal && (
-                  <div className="absolute left-0 top-3 bottom-3 w-[3px] rounded-full" style={{ background: 'linear-gradient(180deg, #fbbf24 0%, #d97706 100%)' }} />
-                )}
-
-                <div className="flex items-start gap-3">
-                  {/* Number + avatar */}
-                  <div className="relative flex-shrink-0">
+                return (
+                  <SortableDoctorWrapper key={doctor.id} id={doctor.id}>
                     <div
-                      className="w-11 h-11 rounded-xl flex items-center justify-center font-bold text-white text-sm tracking-wide"
-                      style={{
-                        background: avatarGradient(doctor.name, isDeal),
-                        boxShadow: '0 2px 6px -1px rgb(0 0 0 / 0.25)',
-                      }}
+                      className="doctor-card relative bg-surface border border-line rounded-2xl p-3.5 cursor-pointer active:scale-[0.99]"
+                      onClick={() => setModalDoctor(doctor)}
+                      style={isDeal ? {
+                        borderColor: 'rgb(245 158 11 / 0.35)',
+                        boxShadow: '0 0 0 1px rgb(245 158 11 / 0.12), 0 4px 12px -4px rgb(245 158 11 / 0.15)',
+                      } : {}}
                     >
-                      {initials}
-                    </div>
-                    {/* Order number */}
-                    <div className="absolute -top-1.5 -left-1.5 w-4.5 h-4.5 min-w-[18px] min-h-[18px] rounded-full bg-surface-2 border border-line flex items-center justify-center">
-                      <span className="text-[9px] font-bold text-muted tabular leading-none px-0.5">{idx + 1}</span>
-                    </div>
-                    <div
-                      className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2"
-                      style={{ backgroundColor: statusColor, borderColor: 'rgb(var(--c-surface))' }}
-                    />
-                  </div>
+                      {isDeal && (
+                        <div className="absolute left-0 top-3 bottom-3 w-[3px] rounded-full" style={{ background: 'linear-gradient(180deg, #fbbf24 0%, #d97706 100%)' }} />
+                      )}
 
-                  {/* Content */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-semibold text-sm text-content leading-tight">{doctor.name}</span>
-                      <span
-                        className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-md border"
-                        style={{ color: classColor, background: `${classColor}1a`, borderColor: `${classColor}44` }}
-                      >
-                        {classLabel}
-                      </span>
-                    </div>
+                      <div className="flex items-start gap-3">
+                        {/* Number + avatar */}
+                        <div className="relative flex-shrink-0">
+                          <div
+                            className="w-11 h-11 rounded-xl flex items-center justify-center font-bold text-white text-sm tracking-wide"
+                            style={{
+                              background: avatarGradient(doctor.name, isDeal),
+                              boxShadow: '0 2px 6px -1px rgb(0 0 0 / 0.25)',
+                            }}
+                          >
+                            {initials}
+                          </div>
+                          {/* Order number */}
+                          <div className="absolute -top-1.5 -left-1.5 w-4.5 h-4.5 min-w-[18px] min-h-[18px] rounded-full bg-surface-2 border border-line flex items-center justify-center">
+                            <span className="text-[9px] font-bold text-muted tabular leading-none px-0.5">{idx + 1}</span>
+                          </div>
+                          <div
+                            className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2"
+                            style={{ backgroundColor: statusColor, borderColor: 'rgb(var(--c-surface))' }}
+                          />
+                        </div>
 
-                    <p className="text-xs text-muted mt-0.5 truncate">
-                      {doctor.specialty}
-                      {doctor.area && <span className="text-subtle"> · {doctor.area}</span>}
-                      {doctor.city && <span className="text-subtle"> · {doctor.city}</span>}
-                      {doctor.location && <span className="text-subtle"> · {doctor.location}</span>}
-                    </p>
+                        {/* Content */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-semibold text-sm text-content leading-tight">{doctor.name}</span>
+                            <span
+                              className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-md border"
+                              style={{ color: classColor, background: `${classColor}1a`, borderColor: `${classColor}44` }}
+                            >
+                              {classLabel}
+                            </span>
+                          </div>
 
-                    {(doctor.phone || (doctor.days?.length > 0) || doctor.time || lastVisit) && (
-                      <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-1.5">
-                        {doctor.phone && <span className="text-[11px] text-subtle tabular">{doctor.phone}</span>}
-                        {doctor.days?.length > 0 && (
-                          <>
-                            {doctor.phone && <span className="text-[10px] text-subtle/60">·</span>}
-                            <span className="text-[11px] text-subtle">{doctor.days.join(' · ')}</span>
-                          </>
-                        )}
-                        {doctor.time && (
-                          <><span className="text-[10px] text-subtle/60">·</span><span className="text-[11px] text-subtle">{doctor.time}</span></>
-                        )}
-                        {lastVisit && (
-                          <><span className="text-[10px] text-subtle/60">·</span><span className="text-[11px] text-subtle">{daysSince(lastVisit.toISOString())}</span></>
-                        )}
+                          <p className="text-xs text-muted mt-0.5 truncate">
+                            {doctor.specialty}
+                            {doctor.area && <span className="text-subtle"> · {doctor.area}</span>}
+                            {doctor.city && <span className="text-subtle"> · {doctor.city}</span>}
+                            {doctor.location && <span className="text-subtle"> · {doctor.location}</span>}
+                          </p>
+
+                          {(doctor.phone || (doctor.days?.length > 0) || doctor.time || lastVisit) && (
+                            <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-1.5">
+                              {doctor.phone && <span className="text-[11px] text-subtle tabular">{doctor.phone}</span>}
+                              {doctor.days?.length > 0 && (
+                                <>
+                                  {doctor.phone && <span className="text-[10px] text-subtle/60">·</span>}
+                                  <span className="text-[11px] text-subtle">{doctor.days.join(' · ')}</span>
+                                </>
+                              )}
+                              {doctor.time && (
+                                <><span className="text-[10px] text-subtle/60">·</span><span className="text-[11px] text-subtle">{doctor.time}</span></>
+                              )}
+                              {lastVisit && (
+                                <><span className="text-[10px] text-subtle/60">·</span><span className="text-[11px] text-subtle">{daysSince(lastVisit.toISOString())}</span></>
+                              )}
+                            </div>
+                          )}
+
+                          {doctor.request && (
+                            <span
+                              className="inline-block mt-1.5 text-[10px] rounded-md px-2 py-0.5 max-w-[200px] truncate border"
+                              style={{ color: 'rgb(var(--c-accent))', background: 'rgb(var(--c-accent) / 0.08)', borderColor: 'rgb(var(--c-accent) / 0.20)' }}
+                            >
+                              {doctor.request}
+                            </span>
+                          )}
+
+                          {doctor.note && (
+                            <p className="text-[11px] text-amber-400/70 mt-1.5 leading-snug line-clamp-1">{doctor.note}</p>
+                          )}
+                        </div>
+
+                        {/* Month badge + Visit button */}
+                        <div className="flex-shrink-0 flex flex-col items-center gap-1 ml-1">
+                          <div
+                            className="w-11 h-11 rounded-xl flex items-center justify-center border tabular font-bold text-base"
+                            style={{ color: badge.color, background: badge.bg, borderColor: badge.border }}
+                          >
+                            {badge.label}
+                          </div>
+                          <span className="text-[8px] text-subtle uppercase tracking-widest font-semibold">{getCurrentMonthName()}</span>
+                          {monthStatus !== 'twice' && (
+                            <button
+                              onClick={(e) => { e.stopPropagation(); visitMutation.mutate(doctor.id); }}
+                              disabled={isPending}
+                              className="mt-1 text-[10px] bg-accent/15 text-accent border border-accent/30 px-2.5 py-1 rounded-lg font-semibold hover:bg-accent/25 transition-colors disabled:opacity-50 whitespace-nowrap"
+                            >
+                              {isPending ? '…' : 'Visit'}
+                            </button>
+                          )}
+                          <button
+                            onClick={(e) => { e.stopPropagation(); setItemAssignDoctor(doctor); }}
+                            className="mt-1 text-[10px] bg-amber-500/12 text-amber-400 border border-amber-500/25 px-2.5 py-1 rounded-lg font-semibold hover:bg-amber-500/20 transition-colors whitespace-nowrap"
+                          >
+                            Items
+                          </button>
+                        </div>
                       </div>
-                    )}
-
-                    {doctor.request && (
-                      <span
-                        className="inline-block mt-1.5 text-[10px] rounded-md px-2 py-0.5 max-w-[200px] truncate border"
-                        style={{ color: 'rgb(var(--c-accent))', background: 'rgb(var(--c-accent) / 0.08)', borderColor: 'rgb(var(--c-accent) / 0.20)' }}
-                      >
-                        {doctor.request}
-                      </span>
-                    )}
-
-                    {doctor.note && (
-                      <p className="text-[11px] text-amber-400/70 mt-1.5 leading-snug line-clamp-1">{doctor.note}</p>
-                    )}
-                  </div>
-
-                  {/* Month badge + Visit button */}
-                  <div className="flex-shrink-0 flex flex-col items-center gap-1 ml-1">
-                    <div
-                      className="w-11 h-11 rounded-xl flex items-center justify-center border tabular font-bold text-base"
-                      style={{ color: badge.color, background: badge.bg, borderColor: badge.border }}
-                    >
-                      {badge.label}
                     </div>
-                    <span className="text-[8px] text-subtle uppercase tracking-widest font-semibold">{getCurrentMonthName()}</span>
-                    {monthStatus !== 'twice' && (
-                      <button
-                        onClick={(e) => { e.stopPropagation(); visitMutation.mutate(doctor.id); }}
-                        disabled={isPending}
-                        className="mt-1 text-[10px] bg-accent/15 text-accent border border-accent/30 px-2.5 py-1 rounded-lg font-semibold hover:bg-accent/25 transition-colors disabled:opacity-50 whitespace-nowrap"
-                      >
-                        {isPending ? '…' : 'Visit'}
-                      </button>
-                    )}
-                    <button
-                      onClick={(e) => { e.stopPropagation(); setItemAssignDoctor(doctor); }}
-                      className="mt-1 text-[10px] bg-amber-500/12 text-amber-400 border border-amber-500/25 px-2.5 py-1 rounded-lg font-semibold hover:bg-amber-500/20 transition-colors whitespace-nowrap"
-                    >
-                      Items
-                    </button>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
+                  </SortableDoctorWrapper>
+                );
+              })}
+            </SortableContext>
+          </DndContext>
         </div>
 
         {/* FABs */}
