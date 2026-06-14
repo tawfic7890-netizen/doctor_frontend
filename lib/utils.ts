@@ -208,6 +208,7 @@ export const AREAS = [
   'Menye',
   'Anfeh',
   'Chekka',
+  'Jbeil',
 ];
 
 /** Known cities / towns per area. Free-text entry is always allowed in addition. */
@@ -228,6 +229,7 @@ export const CITIES: Record<string, string[]> = {
   Menye:   ['Menye', 'Sir el Denniyeh', 'Srar', 'Laqlouq', 'Kfar Remmane'],
   Anfeh:   ['Anfeh', 'Qalamoun'],
   Chekka:  ['Chekka', 'Heri'],
+  Jbeil:   ['Jbeil', 'Amchit', 'Halat', 'Blat', 'Hboub', 'Edde', 'Lassa', 'Aaqoura', 'Mechmech', 'Ghalboun'],
 };
 
 export const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
